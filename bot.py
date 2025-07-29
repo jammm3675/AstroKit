@@ -180,7 +180,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             send_notification,
             interval=10800,  # 3 часа
             first=10,
-            chat_id=chat_id,  # ЗДЕСЬ ДОБАВЛЕНА ЗАПЯТАЯ!
+            chat_id=chat_id,
             name=str(chat_id)
         logger.info(f"Уведомления активированы для пользователя {chat_id}")
 
