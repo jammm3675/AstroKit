@@ -291,8 +291,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             message_id=query.message.message_id,
             text=text,
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-            ),
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")],
             parse_mode="Markdown"
         )
     except BadRequest as e:
