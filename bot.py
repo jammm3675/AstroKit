@@ -20,17 +20,24 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
 
-# Конфигурация API для получения курса TON
-STONFI_API = "https://api.ston.fi/v1/tokens"
-TON_TOKEN_ADDRESS = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kC5Rv0o7iQu8PpON"  # Основной адрес TON в mainnet
+# Конфигурация API для получения курсов криптовалют
+COINGECKO_API = "https://api.coingecko.com/api/v3/simple/price"
+CRYPTO_IDS = {
+    "btc": "bitcoin",
+    "eth": "ethereum",
+    "ton": "the-open-network"
+}
 
 # Глобальное хранилище дневных данных
 daily_data = {
     "date": None,
     "advice": None,
     "horoscopes": {},
-    "ton_price": None,
-    "ton_change": None
+    "crypto_prices": {
+        "btc": {"price": None, "change": None},
+        "eth": {"price": None, "change": None},
+        "ton": {"price": None, "change": None}
+    }
 }
 
 # Генератор случайных гороскопов (300+ вариантов)
@@ -203,37 +210,46 @@ def update_daily_data():
         for sign, variants in HOROSCOPES_DB.items():
             daily_data["horoscopes"][sign] = random.choice(variants)
         
-        # Обновляем курс TON
-        update_ton_price()
+        # Обновляем курсы криптовалют
+        update_crypto_prices()
         
         logger.info(f"Данные обновлены на {today}")
 
-def update_ton_price():
-    """Обновляет курс TON и сохраняет в дневных данных"""
+def update_crypto_prices():
+    """Обновляет курсы криптовалют и сохраняет в дневных данных"""
     try:
-        # Получаем список токенов
-        response = requests.get(STONFI_API, timeout=10)
+        params = {
+            "ids": ",".join(CRYPTO_IDS.values()),
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        
+        response = requests.get(COINGECKO_API, params=params, timeout=15)
         response.raise_for_status()
-        tokens = response.json().get("tokens", [])
+        prices = response.json()
         
-        # Ищем TON по адресу
-        ton_token = next((t for t in tokens if t.get("address") == TON_TOKEN_ADDRESS), None)
+        for symbol, coin_id in CRYPTO_IDS.items():
+            if coin_id in prices:
+                coin_data = prices[coin_id]
+                price = coin_data.get("usd")
+                change = coin_data.get("usd_24h_change")
+                
+                if price is not None and change is not None:
+                    daily_data["crypto_prices"][symbol]["price"] = price
+                    daily_data["crypto_prices"][symbol]["change"] = change
+                    logger.info(f"Курс {symbol.upper()} обновлен: ${price:.2f} ({change:.2f}%)")
         
-        if ton_token:
-            # Цена в USD
-            price_usd = float(ton_token.get("price", {}).get("usd", 0))
-            change_24h = float(ton_token.get("price", {}).get("change_24h", 0))
-            daily_data["ton_price"] = price_usd
-            daily_data["ton_change"] = change_24h
-            logger.info(f"Курс TON обновлен: ${price_usd:.2f} ({change_24h:.2f}%)")
-        else:
-            logger.warning("TON token not found in response")
     except Exception as e:
-        logger.error(f"Ошибка получения цены TON: {e}")
-        # Используем предыдущее значение, если есть
-        if daily_data["ton_price"] is None:
-            daily_data["ton_price"] = 7.50
-            daily_data["ton_change"] = 1.5
+        logger.error(f"Ошибка получения курсов: {e}")
+        # Устанавливаем значения по умолчанию
+        defaults = {
+            "btc": {"price": 60000, "change": 1.2},
+            "eth": {"price": 3000, "change": 0.8},
+            "ton": {"price": 7.50, "change": 2.5}
+        }
+        for symbol in CRYPTO_IDS:
+            if daily_data["crypto_prices"][symbol]["price"] is None:
+                daily_data["crypto_prices"][symbol] = defaults[symbol]
 
 def format_change_bar(percent_change):
     """Форматирование графического представления изменения цены"""
@@ -244,7 +260,8 @@ def format_change_bar(percent_change):
     filled = min(int(abs(percent_change) * bar_length / 10), bar_length)
     bar = "▰" * filled + "▱" * (bar_length - filled)
     symbol = "▲" if percent_change >= 0 else "▼"
-    return f"{symbol}{abs(percent_change):.1f}%", bar
+    color = "🟢" if percent_change >= 0 else "🔴"
+    return f"{color} {symbol}{abs(percent_change):.1f}%", bar
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start"""
@@ -275,7 +292,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     
     # Запуск уведомлений, если они включены
-    if user_settings[chat_id]["notifications"]:
+    if user_settings[chat_id]["notifications"] and context.job_queue:
         context.job_queue.run_repeating(
             send_notification,
             interval=10800,  # 3 часа
@@ -350,11 +367,11 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     # Получаем рыночные данные
     market_text = "\n\n📊 *Курс криптовалют:*\n"
     
-    if daily_data["ton_price"] is not None and daily_data["ton_change"] is not None:
-        change_text, bar = format_change_bar(daily_data["ton_change"])
-        market_text += f"TON: ${daily_data['ton_price']:,.2f} {change_text} (24h) {bar}\n"
-    else:
-        market_text += "Данные о курсе временно недоступны\n"
+    for symbol in CRYPTO_IDS:
+        price_data = daily_data["crypto_prices"][symbol]
+        if price_data["price"] is not None and price_data["change"] is not None:
+            change_text, bar = format_change_bar(price_data["change"])
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h) {bar}\n"
     
     # Формируем текст гороскопа
     text = (
@@ -430,7 +447,7 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
     user_settings[chat_id] = {"notifications": new_status}
     
     # Обновляем или удаляем задачу
-    if new_status:
+    if new_status and context.job_queue:
         # Создаем новую задачу
         context.job_queue.run_repeating(
             send_notification,
@@ -439,7 +456,7 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
             chat_id=chat_id,
             name=str(chat_id))
         logger.info(f"Уведомления включены для {chat_id}")
-    else:
+    elif not new_status and context.job_queue:
         # Удаляем существующую задачу
         current_jobs = context.job_queue.get_jobs_by_name(str(chat_id))
         for job in current_jobs:
@@ -455,11 +472,15 @@ async def send_notification(context: ContextTypes.DEFAULT_TYPE):
     chat_id = job.chat_id
     
     # Выбираем случайное уведомление
-    alert = (
-        "⚠️ *АСТРО-ТРЕВОГА!*\n\n"
-        "Меркурий ретроградный → Ожидайте технических сбоев на биржах и кошельках. "
-        "Рекомендуется отложить крупные транзакции!"
-    )
+    alerts = [
+        "⚠️ *АСТРО-ТРЕВОГА!*\n\nМеркурий ретроградный → Ожидайте технических сбоев на биржах и кошельках. Рекомендуется отложить крупные транзакции!",
+        "🌟 *ЗВЕЗДНАЯ ВОЗМОЖНОСТЬ!*\n\nЮпитер входит в знак Стрельца → Благоприятный период для долгосрочных инвестиций!",
+        "🔮 *ПРЕДУПРЕЖДЕНИЕ!*\n\nЛуна в Скорпионе → Повышенная волатильность на рынке! Будьте осторожны с кредитным плечом.",
+        "💫 *АСТРО-ПРОГНОЗ!*\n\nВенера сближается с Сатурном → Идеальное время для ребалансировки портфеля!",
+        "🌕 *ОСОБЫЙ ПЕРИОД!*\n\nПолнолуние в Водолее → Ожидайте неожиданных рыночных движений! Готовьтесь к возможным коррекциям."
+    ]
+    
+    alert = random.choice(alerts)
     
     try:
         message = await context.bot.send_message(
@@ -571,7 +592,7 @@ def run_flask_server():
         return "OK", 200
 
     port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, threaded=True)
 
 def keep_alive():
     """Регулярные запросы для поддержания активности"""
@@ -625,7 +646,8 @@ def main() -> None:
             application.run_polling(
                 drop_pending_updates=True,
                 allowed_updates=Update.ALL_TYPES,
-                poll_interval=1.5
+                poll_interval=3.0,  # Увеличенный интервал
+                close_loop=False
             )
             break
         except Conflict as e:
