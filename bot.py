@@ -76,7 +76,7 @@ def generate_horoscopes():
             
             text = (
                 f"♈ {sign}:\n"
-                f"Сегодня {mood} для крипто-активов! Звезды советуют {action} {asset}. "
+                f"Сегодня {mood} для крипто-активов! Звезды советуют: {action} {asset}. "
                 f"Особое внимание уделите {theme}. {ending.capitalize()}!"
             )
             variants.append(text)
@@ -116,17 +116,17 @@ PREMIUM_OPTIONS = {
     "tomorrow": {
         "title": "🔮 Завтрашний прогноз",
         "description": "Узнайте, что ждет ваш портфель завтра",
-        "price": "5 TON"
+        "price": "2$"
     },
     "weekly": {
         "title": "📅 Прогноз на неделю",
         "description": "Планируйте свою стратегию на всю неделю",
-        "price": "20 TON"
+        "price": "5$"
     },
     "permanent": {
         "title": "💎 Постоянный доступ",
         "description": "Ежедневные прогнозы и эксклюзивные аналитические материалы",
-        "price": "50 TON/мес"
+        "price": "7$/мес"
     }
 }
 
@@ -144,7 +144,7 @@ def main_menu_keyboard():
             InlineKeyboardButton("⚙️ Настройки", callback_data="settings_menu")
         ],
         [
-            InlineKeyboardButton("🔮 Премиум", callback_data="premium_menu")
+            InlineKeyboardButton("💎 Премиум", callback_data="premium_menu")
         ]
     ])
 
@@ -277,7 +277,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Приветственное сообщение
     text = (
-        f"✨ *Добро пожаловать в AstroKit, {user.first_name}!*\n\n"
+        f"✨ *Добро пожаловать в AstroKit, {user.first_name}!* ✨\n\n"
         "Ваш персональный крипто-астролог!\n"
         "На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\n\n"
         "Выбери интересующий раздел, но перед этим ознакомься с [пользовательским соглашением](https://example.com/tos)."
@@ -295,7 +295,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user_settings[chat_id]["notifications"] and context.job_queue:
         context.job_queue.run_repeating(
             send_notification,
-            interval=10800,  # 3 часа
+            interval=600,  # 3 часа(10800) сейчас стоит 600
             first=10,
             chat_id=chat_id,
             name=str(chat_id)
@@ -311,7 +311,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     update_daily_data()
     
     text = (
-        "✨ *Главное меню*\n\n"
+        "✨ *Главное меню* ✨\n\n"
         "Выберите интересующий раздел:"
     )
     
