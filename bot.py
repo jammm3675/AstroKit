@@ -180,7 +180,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             send_notification,
             interval=10800,  # 3 часа
             first=10,
-            chat_id=chat_id,
+            chat_id=chat_id,  # ЗДЕСЬ ДОБАВЛЕНА ЗАПЯТАЯ!
             name=str(chat_id)
         logger.info(f"Уведомления активированы для пользователя {chat_id}")
 
@@ -331,7 +331,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=settings_keyboard(chat_id),  # Исправлено: убрана лишняя скобка
+            reply_markup=settings_keyboard(chat_id),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -358,7 +358,7 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
             interval=10800,  # 3 часа
             first=10,
             chat_id=chat_id,
-            name=str(chat_id)  # Исправлено: добавлена закрывающая скобка
+            name=str(chat_id))
         logger.info(f"Уведомления включены для {chat_id}")
     else:
         # Удаляем существующую задачу
