@@ -289,12 +289,14 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
         await context.bot.edit_message_text(
             chat_id=query.message.chat_id,
             message_id=query.message.message_id,
-            text="♈ *Выберите ваш знак зодиака:*",
-            reply_markup=zodiac_keyboard(),
+            text=text,
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
+            ]),
             parse_mode="Markdown"
         )
     except BadRequest as e:
-        logger.error(f"Ошибка при показе меню гороскопа: {e}")
+        logger.error(f"Ошибка при показе гороскопа: {e}")
 
 async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показ обучающего совета"""
@@ -356,7 +358,7 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
             interval=10800,  # 3 часа
             first=10,
             chat_id=chat_id,
-            name=str(chat_id)
+            name=str(chat_id))
         logger.info(f"Уведомления включены для {chat_id}")
     else:
         # Удаляем существующую задачу
