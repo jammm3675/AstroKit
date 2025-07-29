@@ -176,12 +176,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     # Запуск уведомлений, если они включены
     if user_settings[chat_id]["notifications"]:
-        context.job_queue.run_repeating(
+        context.job_queue.run_repeating(  # ФИКС: Закрывающая скобка добавлена
             send_notification,
             interval=10800,  # 3 часа
             first=10,
             chat_id=chat_id,
             name=str(chat_id)
+        )
         logger.info(f"Уведомления активированы для пользователя {chat_id}")
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
