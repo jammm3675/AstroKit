@@ -319,7 +319,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if user_settings[chat_id]["notifications"] and context.job_queue:
         context.job_queue.run_repeating(
             send_notification,
-            interval=10800,  # 3 часа
+            interval=600,  # 3 часа
             first=10,
             chat_id=chat_id,
             name=str(chat_id)
@@ -483,7 +483,7 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
         # Создаем новую задачу
         context.job_queue.run_repeating(
             send_notification,
-            interval=10800,  # 3 часа
+            interval=600,  # 3 часа
             first=10,
             chat_id=chat_id,
             name=str(chat_id))
@@ -639,7 +639,7 @@ def keep_alive():
             logger.info(f"Keep-alive запрос: Status {response.status_code}")
         except Exception as e:
             logger.error(f"Ошибка keep-alive: {e}")
-        time.sleep(14 * 60)  # 14 минут
+        time.sleep(10 * 60)  # 10 минут
 
 def main() -> None:
     """Основная функция запуска бота"""
@@ -683,7 +683,7 @@ def main() -> None:
         
         application.job_queue.run_repeating(
             daily_update,
-            interval=86400,  # 24 часа
+            interval=600,  # 10 минут
             first=delay,
             name="daily_update"
         )
@@ -693,7 +693,7 @@ def main() -> None:
     
     # Запуск с обработкой ошибок
     max_retries = 5
-    retry_delay = 15  # Увеличена начальная задержка
+    retry_delay = 14  # Увеличена начальная задержка
     
     for attempt in range(max_retries):
         try:
