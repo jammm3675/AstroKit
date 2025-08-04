@@ -28,16 +28,14 @@ CRYPTO_IDS = {
     "ton": "the-open-network"
 }
 
-# Глобальное хранилище дневных данных
-daily_data = {
-    "date": None,
-    "advice": None,
-    "horoscopes": {},
-    "crypto_prices": {
-        "btc": {"price": None, "change": None},
-        "eth": {"price": None, "change": None},
-        "ton": {"price": None, "change": None}
-    }
+# Хранение данных пользователей (индивидуально для каждого пользователя)
+user_data = {}
+
+# Глобальное хранилище курсов криптовалют (обновляется в реальном времени)
+crypto_prices = {
+    "btc": {"price": None, "change": None, "last_update": None},
+    "eth": {"price": None, "change": None, "last_update": None},
+    "ton": {"price": None, "change": None, "last_update": None}
 }
 
 # Генератор случайных гороскопов (улучшенные варианты)
@@ -143,8 +141,98 @@ PREMIUM_OPTIONS = {
     }
 }
 
-# Хранение настроек пользователей (в памяти)
-user_settings = {}
+def get_user_data(chat_id):
+    """Получение или создание данных пользователя"""
+    if chat_id not in user_data:
+        user_data[chat_id] = {
+            "notifications": True,
+            "last_horoscope_date": None,
+            "horoscopes": {},
+            "advice": None,
+            "notification_time": "09:00"  # По умолчанию в 9:00
+        }
+    return user_data[chat_id]
+
+def update_user_horoscope(chat_id):
+    """Обновление гороскопа для конкретного пользователя"""
+    user_info = get_user_data(chat_id)
+    today = date.today()
+    
+    # Проверяем, нужно ли обновить гороскоп (прошло 24 часа)
+    if user_info["last_horoscope_date"] != today:
+        logger.info(f"Обновление гороскопа для пользователя {chat_id}")
+        user_info["last_horoscope_date"] = today
+        
+        # Выбираем случайный совет дня для пользователя
+        user_info["advice"] = random.choice(LEARNING_TIPS)
+        
+        # Выбираем случайные гороскопы для каждого знака для этого пользователя
+        for sign, variants in HOROSCOPES_DB.items():
+            user_info["horoscopes"][sign] = random.choice(variants)
+        
+        logger.info(f"Гороскоп обновлен для пользователя {chat_id} на {today}")
+
+def update_crypto_prices():
+    """Обновляет курсы криптовалют в реальном времени"""
+    try:
+        params = {
+            "ids": ",".join(CRYPTO_IDS.values()),
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        }
+        
+        # Добавляем User-Agent для избежания блокировки
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        
+        response = requests.get(CRYPTO_API, params=params, headers=headers, timeout=15)
+        
+        # Обработка ограничений API
+        if response.status_code == 429:
+            logger.warning("Превышен лимит запросов к API. Используем кэшированные данные.")
+            return
+            
+        response.raise_for_status()
+        prices = response.json()
+        
+        current_time = datetime.now()
+        
+        for symbol, coin_id in CRYPTO_IDS.items():
+            if coin_id in prices:
+                coin_data = prices[coin_id]
+                price = coin_data.get("usd")
+                change = coin_data.get("usd_24h_change")
+                
+                if price is not None and change is not None:
+                    crypto_prices[symbol]["price"] = price
+                    crypto_prices[symbol]["change"] = change
+                    crypto_prices[symbol]["last_update"] = current_time
+                    logger.info(f"Курс {symbol.upper()} обновлен: ${price:.2f} ({change:.2f}%)")
+        
+    except Exception as e:
+        logger.error(f"Ошибка получения курсов: {e}")
+        # Устанавливаем значения по умолчанию только если нет текущих данных
+        if crypto_prices["btc"]["price"] is None:
+            defaults = {
+                "btc": {"price": 60000, "change": 1.2},
+                "eth": {"price": 3000, "change": 0.8},
+                "ton": {"price": 7.50, "change": 2.5}
+            }
+            for symbol in CRYPTO_IDS:
+                crypto_prices[symbol] = {**defaults[symbol], "last_update": datetime.now()}
+
+def format_change_bar(percent_change):
+    """Форматирование графического представления изменения цены"""
+    if percent_change is None:
+        return "N/A", ""
+    
+    bar_length = 10
+    filled = min(int(abs(percent_change) * bar_length / 10), bar_length)
+    bar = "▰" * filled + "▱" * (bar_length - filled)
+    symbol = "▲" if percent_change >= 0 else "▼"
+    color = "🟢" if percent_change >= 0 else "🔴"
+    return f"{color} {symbol}{abs(percent_change):.1f}%", bar
 
 def main_menu_keyboard():
     """Клавиатура главного меню"""
@@ -188,7 +276,8 @@ def zodiac_keyboard():
 def settings_keyboard(chat_id):
     """Клавиатура настроек"""
     # Получаем текущий статус уведомлений
-    notifications_on = user_settings.get(chat_id, {}).get("notifications", True)
+    user_info = get_user_data(chat_id)
+    notifications_on = user_info.get("notifications", True)
     
     toggle_text = "🔕 Выключить уведомления" if notifications_on else "🔔 Включить уведомления"
     
@@ -208,96 +297,19 @@ def premium_menu_keyboard():
     buttons.append([InlineKeyboardButton("⬅️ Назад", callback_data="main_menu")])
     return InlineKeyboardMarkup(buttons)
 
-def update_daily_data():
-    """Обновляет дневные данные при смене даты"""
-    today = date.today()
-    
-    if daily_data["date"] != today:
-        logger.info("Обновление дневных данных...")
-        daily_data["date"] = today
-        
-        # Выбираем случайный совет дня (фиксируется на день)
-        daily_data["advice"] = random.choice(LEARNING_TIPS)
-        
-        # Выбираем случайные гороскопы для каждого знака (фиксируются на день)
-        for sign, variants in HOROSCOPES_DB.items():
-            daily_data["horoscopes"][sign] = random.choice(variants)
-        
-        # Обновляем курсы криптовалют
-        update_crypto_prices()
-        
-        logger.info(f"Данные обновлены на {today}")
-
-def update_crypto_prices():
-    """Обновляет курсы криптовалют и сохраняет в дневных данных"""
-    try:
-        params = {
-            "ids": ",".join(CRYPTO_IDS.values()),
-            "vs_currencies": "usd",
-            "include_24hr_change": "true"
-        }
-        
-        # Добавляем User-Agent для избежания блокировки
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        
-        response = requests.get(CRYPTO_API, params=params, headers=headers, timeout=15)
-        
-        # Обработка ограничений API
-        if response.status_code == 429:
-            logger.warning("Превышен лимит запросов к API. Используем кэшированные данные.")
-            return
-            
-        response.raise_for_status()
-        prices = response.json()
-        
-        for symbol, coin_id in CRYPTO_IDS.items():
-            if coin_id in prices:
-                coin_data = prices[coin_id]
-                price = coin_data.get("usd")
-                change = coin_data.get("usd_24h_change")
-                
-                if price is not None and change is not None:
-                    daily_data["crypto_prices"][symbol]["price"] = price
-                    daily_data["crypto_prices"][symbol]["change"] = change
-                    logger.info(f"Курс {symbol.upper()} обновлен: ${price:.2f} ({change:.2f}%)")
-        
-    except Exception as e:
-        logger.error(f"Ошибка получения курсов: {e}")
-        # Устанавливаем значения по умолчанию только если нет текущих данных
-        if daily_data["crypto_prices"]["btc"]["price"] is None:
-            defaults = {
-                "btc": {"price": 60000, "change": 1.2},
-                "eth": {"price": 3000, "change": 0.8},
-                "ton": {"price": 7.50, "change": 2.5}
-            }
-            for symbol in CRYPTO_IDS:
-                daily_data["crypto_prices"][symbol] = defaults[symbol]
-
-def format_change_bar(percent_change):
-    """Форматирование графического представления изменения цены"""
-    if percent_change is None:
-        return "N/A", ""
-    
-    bar_length = 10
-    filled = min(int(abs(percent_change) * bar_length / 10), bar_length)
-    bar = "▰" * filled + "▱" * (bar_length - filled)
-    symbol = "▲" if percent_change >= 0 else "▼"
-    color = "🟢" if percent_change >= 0 else "🔴"
-    return f"{color} {symbol}{abs(percent_change):.1f}%", bar
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Обработчик команды /start"""
     user = update.effective_user
     chat_id = update.effective_chat.id
     
-    # Инициализация настроек пользователя
-    if chat_id not in user_settings:
-        user_settings[chat_id] = {"notifications": True}
+    # Инициализация данных пользователя
+    get_user_data(chat_id)
     
-    # Обновляем дневные данные
-    update_daily_data()
+    # Обновляем гороскоп для пользователя
+    update_user_horoscope(chat_id)
+    
+    # Обновляем курсы криптовалют
+    update_crypto_prices()
     
     # Приветственное сообщение
     text = (
@@ -316,23 +328,42 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
     
     # Запуск уведомлений, если они включены
-    if user_settings[chat_id]["notifications"] and context.job_queue:
-        context.job_queue.run_repeating(
-            send_notification,
-            interval=600,  # 3 часа
-            first=10,
-            chat_id=chat_id,
-            name=str(chat_id)
-        )
+    user_info = get_user_data(chat_id)
+    if user_info["notifications"] and context.job_queue:
+        # Планируем уведомления на указанное время
+        schedule_user_notifications(context.job_queue, chat_id, user_info["notification_time"])
         logger.info(f"Уведомления активированы для пользователя {chat_id}")
+
+def schedule_user_notifications(job_queue, chat_id, notification_time):
+    """Планирование уведомлений для пользователя на указанное время"""
+    try:
+        # Парсим время уведомлений (формат "HH:MM")
+        hour, minute = map(int, notification_time.split(":"))
+        
+        # Удаляем существующие задачи для этого пользователя
+        current_jobs = job_queue.get_jobs_by_name(f"notification_{chat_id}")
+        for job in current_jobs:
+            job.schedule_removal()
+        
+        # Создаем новую задачу на указанное время
+        job_queue.run_daily(
+            send_notification,
+            time=time(hour, minute),
+            chat_id=chat_id,
+            name=f"notification_{chat_id}"
+        )
+        logger.info(f"Уведомления запланированы для {chat_id} на {notification_time}")
+    except Exception as e:
+        logger.error(f"Ошибка планирования уведомлений для {chat_id}: {e}")
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Показ главного меню"""
     query = update.callback_query
     chat_id = query.message.chat_id if query else update.effective_chat.id
     
-    # Обновляем дневные данные
-    update_daily_data()
+    # Обновляем данные пользователя
+    update_user_horoscope(chat_id)
+    update_crypto_prices()
     
     text = (
         "✨ *Главное меню* ✨\n\n"
@@ -363,8 +394,9 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     
-    # Обновляем дневные данные
-    update_daily_data()
+    # Обновляем данные пользователя
+    chat_id = query.message.chat_id
+    update_user_horoscope(chat_id)
     
     try:
         await context.bot.edit_message_text(
@@ -382,25 +414,32 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     
-    # Обновляем дневные данные
-    update_daily_data()
+    chat_id = query.message.chat_id
+    
+    # Обновляем данные пользователя
+    update_user_horoscope(chat_id)
+    update_crypto_prices()
+    
+    # Получаем данные пользователя
+    user_info = get_user_data(chat_id)
     
     # Получаем текущую дату
     current_date = datetime.now().strftime("%d.%m.%Y")
     
     # Получаем рыночные данные
-    market_text = "\n\n📊 *Курс криптовалют:*\n"
+    market_text = "\n\n📊 *Курс криптовалют (обновлено в реальном времени):*\n"
     
     for symbol in CRYPTO_IDS:
-        price_data = daily_data["crypto_prices"][symbol]
+        price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
             change_text, bar = format_change_bar(price_data["change"])
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n\n"
+            last_update = price_data["last_update"].strftime("%H:%M") if price_data["last_update"] else "N/A"
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\nОбновлено: {last_update}\n\n"
     
     # Формируем текст гороскопа
     text = (
         f"✨ *{zodiac} | {current_date}*\n\n"
-        f"{daily_data['horoscopes'].get(zodiac, 'Гороскоп временно недоступен')}\n"
+        f"{user_info['horoscopes'].get(zodiac, 'Гороскоп временно недоступен')}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{market_text}"
     )
@@ -423,10 +462,15 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
     
-    # Обновляем дневные данные
-    update_daily_data()
+    chat_id = query.message.chat_id
     
-    text = f"💡 *Совет дня*\n\n🌟 {daily_data['advice']}"
+    # Обновляем данные пользователя
+    update_user_horoscope(chat_id)
+    
+    # Получаем данные пользователя
+    user_info = get_user_data(chat_id)
+    
+    text = f"💡 *Совет дня*\n\n🌟 {user_info['advice']}"
     
     try:
         await context.bot.edit_message_text(
@@ -445,12 +489,14 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     chat_id = query.message.chat_id
     
-    # Получаем текущий статус уведомлений
-    notifications_status = "включены ✅" if user_settings.get(chat_id, {}).get("notifications", True) else "выключены ❌"
+    # Получаем данные пользователя
+    user_info = get_user_data(chat_id)
+    notifications_status = "включены ✅" if user_info.get("notifications", True) else "выключены ❌"
     
     text = (
         "⚙️ *Настройки уведомлений*\n\n"
-        f"🔔 Текущий статус: {notifications_status}\n\n"
+        f"🔔 Текущий статус: {notifications_status}\n"
+        f"⏰ Время уведомлений: {user_info.get('notification_time', '09:00')}\n\n"
         "Управляйте астро-оповещениями:"
     )
     
@@ -471,26 +517,21 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     chat_id = query.message.chat_id
     
-    # Получаем текущие настройки
-    settings = user_settings.get(chat_id, {"notifications": True})
-    new_status = not settings["notifications"]
+    # Получаем данные пользователя
+    user_info = get_user_data(chat_id)
+    new_status = not user_info.get("notifications", True)
     
     # Обновляем настройки
-    user_settings[chat_id] = {"notifications": new_status}
+    user_info["notifications"] = new_status
     
     # Обновляем или удаляем задачу
     if new_status and context.job_queue:
         # Создаем новую задачу
-        context.job_queue.run_repeating(
-            send_notification,
-            interval=600,  # 3 часа
-            first=10,
-            chat_id=chat_id,
-            name=str(chat_id))
+        schedule_user_notifications(context.job_queue, chat_id, user_info["notification_time"])
         logger.info(f"Уведомления включены для {chat_id}")
     elif not new_status and context.job_queue:
         # Удаляем существующую задачу
-        current_jobs = context.job_queue.get_jobs_by_name(str(chat_id))
+        current_jobs = context.job_queue.get_jobs_by_name(f"notification_{chat_id}")
         for job in current_jobs:
             job.schedule_removal()
         logger.info(f"Уведомления отключены для {chat_id}")
@@ -647,8 +688,8 @@ def main() -> None:
         logger.error("❌ BOT_TOKEN не установлен!")
         return
 
-    # Инициализация дневных данных
-    update_daily_data()
+    # Инициализация курсов криптовалют
+    update_crypto_prices()
     
     # Запуск Flask сервера в отдельном потоке
     server_thread = threading.Thread(target=run_flask_server)
@@ -670,24 +711,14 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
 
-    # Задача для ежедневного обновления данных в полночь по UTC
+    # Задача для обновления курсов криптовалют каждые 5 минут
     if application.job_queue:
-        async def daily_update(context: ContextTypes.DEFAULT_TYPE):
-            logger.info("⏰ Выполнение ежедневного обновления данных...")
-            update_daily_data()
-            
-        # Рассчитываем время до следующей полночи по UTC
-        now = datetime.utcnow()
-        next_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        delay = (next_midnight - now).total_seconds()
-        
         application.job_queue.run_repeating(
-            daily_update,
-            interval=600,  # 10 минут
-            first=delay,
-            name="daily_update"
+            lambda context: update_crypto_prices(),
+            interval=300,  # 5 минут
+            name="crypto_update"
         )
-        logger.info(f"⏰ Ежедневное обновление запланировано через {delay/3600:.1f} часов")
+        logger.info("📊 Обновление курсов криптовалют запланировано каждые 5 минут")
 
     logger.info("🤖 Бот запущен! Ожидание сообщений...")
     
