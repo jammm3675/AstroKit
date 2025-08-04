@@ -5,6 +5,7 @@ import time
 import requests
 import asyncio
 import random
+import json
 from datetime import datetime, date, timedelta
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -20,22 +21,95 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '')
 
-# Конфигурация API для получения курсов криптовалют (исправленный формат)
-CRYPTO_API = "https://api.coingecko.com/api/v3/simple/price"
+# Конфигурация API для получения курсов криптовалют (множественные источники)
+CRYPTO_APIS = {
+    "coingecko": {
+        "url": "https://api.coingecko.com/api/v3/simple/price",
+        "params": {
+            "ids": "bitcoin,ethereum,the-open-network",
+            "vs_currencies": "usd",
+            "include_24hr_change": "true"
+        },
+        "headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        }
+    },
+    "binance": {
+        "url": "https://api.binance.com/api/v3/ticker/24hr",
+        "symbols": ["BTCUSDT", "ETHUSDT", "TONUSDT"]
+    },
+    "cryptocompare": {
+        "url": "https://min-api.cryptocompare.com/data/pricemultifull",
+        "params": {
+            "fsyms": "BTC,ETH,TON",
+            "tsyms": "USD"
+        }
+    }
+}
+
 CRYPTO_IDS = {
     "btc": "bitcoin",
-    "eth": "ethereum",
+    "eth": "ethereum", 
     "ton": "the-open-network"
 }
 
 # Хранение данных пользователей (индивидуально для каждого пользователя)
 user_data = {}
 
-# Глобальное хранилище курсов криптовалют (обновляется в реальном времени)
+# Глобальное хранилище курсов криптовалют с кэшированием
 crypto_prices = {
-    "btc": {"price": None, "change": None, "last_update": None},
-    "eth": {"price": None, "change": None, "last_update": None},
-    "ton": {"price": None, "change": None, "last_update": None}
+    "btc": {"price": None, "change": None, "last_update": None, "source": None},
+    "eth": {"price": None, "change": None, "last_update": None, "source": None},
+    "ton": {"price": None, "change": None, "last_update": None, "source": None}
+}
+
+# Кэш для API запросов
+api_cache = {
+    "last_update": None,
+    "cache_duration": 300,  # 5 минут
+    "failed_attempts": 0,
+    "current_source": "coingecko"
+}
+
+def save_cache_to_file():
+    """Сохранение кэша в файл"""
+    try:
+        cache_data = {
+            "crypto_prices": crypto_prices,
+            "api_cache": api_cache,
+            "timestamp": datetime.now().isoformat()
+        }
+        with open("cache.json", "w") as f:
+            json.dump(cache_data, f, default=str)
+        logger.info("💾 Кэш сохранен в файл")
+    except Exception as e:
+        logger.error(f"Ошибка сохранения кэша: {e}")
+
+def load_cache_from_file():
+    """Загрузка кэша из файла"""
+    try:
+        with open("cache.json", "r") as f:
+            cache_data = json.load(f)
+        
+        # Восстанавливаем данные
+        global crypto_prices, api_cache
+        crypto_prices = cache_data.get("crypto_prices", crypto_prices)
+        api_cache = cache_data.get("api_cache", api_cache)
+        
+        logger.info("📂 Кэш загружен из файла")
+        return True
+    except FileNotFoundError:
+        logger.info("📂 Файл кэша не найден, используем значения по умолчанию")
+        return False
+    except Exception as e:
+        logger.error(f"Ошибка загрузки кэша: {e}")
+        return False
+
+# Резервные данные на случай недоступности API
+FALLBACK_DATA = {
+    "btc": {"price": 60000, "change": 1.2, "source": "fallback"},
+    "eth": {"price": 3000, "change": 0.8, "source": "fallback"},
+    "ton": {"price": 7.50, "change": 2.5, "source": "fallback"}
 }
 
 # Генератор случайных гороскопов (улучшенные варианты)
@@ -173,30 +247,68 @@ def update_user_horoscope(chat_id):
         logger.info(f"Гороскоп обновлен для пользователя {chat_id} на {today}")
 
 def update_crypto_prices():
-    """Обновляет курсы криптовалют в реальном времени"""
+    """Обновляет курсы криптовалют в реальном времени с множественными источниками"""
     try:
-        params = {
-            "ids": ",".join(CRYPTO_IDS.values()),
-            "vs_currencies": "usd",
-            "include_24hr_change": "true"
-        }
-        
-        # Добавляем User-Agent для избежания блокировки
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
-        
-        response = requests.get(CRYPTO_API, params=params, headers=headers, timeout=15)
-        
-        # Обработка ограничений API
-        if response.status_code == 429:
-            logger.warning("Превышен лимит запросов к API. Используем кэшированные данные.")
+        # Проверяем, нужно ли обновлять данные из API
+        if api_cache["last_update"] is not None and \
+           (datetime.now() - api_cache["last_update"]).total_seconds() < api_cache["cache_duration"]:
+            logger.info("Используем кэшированные данные курсов.")
             return
+
+        # Определяем текущий источник для обновления
+        current_source = api_cache["current_source"]
+        
+        if current_source == "coingecko":
+            success = _update_from_coingecko()
+        elif current_source == "binance":
+            success = _update_from_binance()
+        elif current_source == "cryptocompare":
+            success = _update_from_cryptocompare()
+        else:
+            logger.warning(f"Неизвестный источник API: {current_source}. Используем кэшированные данные.")
+            return
+
+        if success:
+            api_cache["last_update"] = datetime.now()
+            api_cache["failed_attempts"] = 0
+            logger.info(f"Курсы успешно обновлены от {current_source}")
+            # Сохраняем кэш после успешного обновления
+            save_cache_to_file()
+        else:
+            api_cache["failed_attempts"] += 1
+            if api_cache["failed_attempts"] >= 3:
+                logger.error("Слишком много неудачных запросов. Используем резервные данные.")
+                _use_fallback_data()
+                save_cache_to_file()
+            else:
+                # Переключаемся на следующий источник
+                _switch_api_source()
+                logger.info(f"Переключение на источник: {api_cache['current_source']}")
+
+    except Exception as e:
+        logger.error(f"Ошибка получения курсов: {e}")
+        _use_fallback_data()
+
+def _update_from_coingecko():
+    """Обновление курсов от CoinGecko API"""
+    try:
+        api_config = CRYPTO_APIS["coingecko"]
+        response = requests.get(
+            api_config["url"], 
+            params=api_config["params"], 
+            headers=api_config["headers"], 
+            timeout=15
+        )
+        
+        if response.status_code == 429:
+            logger.warning("CoinGecko: превышен лимит запросов")
+            return False
             
         response.raise_for_status()
         prices = response.json()
         
         current_time = datetime.now()
+        success_count = 0
         
         for symbol, coin_id in CRYPTO_IDS.items():
             if coin_id in prices:
@@ -208,19 +320,123 @@ def update_crypto_prices():
                     crypto_prices[symbol]["price"] = price
                     crypto_prices[symbol]["change"] = change
                     crypto_prices[symbol]["last_update"] = current_time
-                    logger.info(f"Курс {symbol.upper()} обновлен: ${price:.2f} ({change:.2f}%)")
+                    crypto_prices[symbol]["source"] = "coingecko"
+                    success_count += 1
+                    logger.info(f"Курс {symbol.upper()}: ${price:.2f} ({change:.2f}%)")
+        
+        return success_count > 0
         
     except Exception as e:
-        logger.error(f"Ошибка получения курсов: {e}")
-        # Устанавливаем значения по умолчанию только если нет текущих данных
-        if crypto_prices["btc"]["price"] is None:
-            defaults = {
-                "btc": {"price": 60000, "change": 1.2},
-                "eth": {"price": 3000, "change": 0.8},
-                "ton": {"price": 7.50, "change": 2.5}
-            }
-            for symbol in CRYPTO_IDS:
-                crypto_prices[symbol] = {**defaults[symbol], "last_update": datetime.now()}
+        logger.error(f"Ошибка CoinGecko API: {e}")
+        return False
+
+def _update_from_binance():
+    """Обновление курсов от Binance API"""
+    try:
+        api_config = CRYPTO_APIS["binance"]
+        current_time = datetime.now()
+        success_count = 0
+        
+        for symbol in api_config["symbols"]:
+            response = requests.get(
+                f"{api_config['url']}?symbol={symbol}",
+                timeout=10
+            )
+            
+            if response.status_code == 429:
+                logger.warning("Binance: превышен лимит запросов")
+                return False
+                
+            response.raise_for_status()
+            data = response.json()
+            
+            # Преобразуем символы Binance в наши символы
+            symbol_map = {"BTCUSDT": "btc", "ETHUSDT": "eth", "TONUSDT": "ton"}
+            our_symbol = symbol_map.get(symbol)
+            
+            if our_symbol and data:
+                price = float(data.get("lastPrice", 0))
+                change = float(data.get("priceChangePercent", 0))
+                
+                if price > 0:
+                    crypto_prices[our_symbol]["price"] = price
+                    crypto_prices[our_symbol]["change"] = change
+                    crypto_prices[our_symbol]["last_update"] = current_time
+                    crypto_prices[our_symbol]["source"] = "binance"
+                    success_count += 1
+                    logger.info(f"Курс {our_symbol.upper()}: ${price:.2f} ({change:.2f}%)")
+        
+        return success_count > 0
+        
+    except Exception as e:
+        logger.error(f"Ошибка Binance API: {e}")
+        return False
+
+def _update_from_cryptocompare():
+    """Обновление курсов от CryptoCompare API"""
+    try:
+        api_config = CRYPTO_APIS["cryptocompare"]
+        response = requests.get(
+            api_config["url"],
+            params=api_config["params"],
+            timeout=15
+        )
+        
+        if response.status_code == 429:
+            logger.warning("CryptoCompare: превышен лимит запросов")
+            return False
+            
+        response.raise_for_status()
+        data = response.json()
+        
+        current_time = datetime.now()
+        success_count = 0
+        
+        if "RAW" in data:
+            raw_data = data["RAW"]
+            symbol_map = {"BTC": "btc", "ETH": "eth", "TON": "ton"}
+            
+            for api_symbol, our_symbol in symbol_map.items():
+                if api_symbol in raw_data and "USD" in raw_data[api_symbol]:
+                    usd_data = raw_data[api_symbol]["USD"]
+                    price = usd_data.get("PRICE", 0)
+                    change = usd_data.get("CHANGEPCT24HOUR", 0)
+                    
+                    if price > 0:
+                        crypto_prices[our_symbol]["price"] = price
+                        crypto_prices[our_symbol]["change"] = change
+                        crypto_prices[our_symbol]["last_update"] = current_time
+                        crypto_prices[our_symbol]["source"] = "cryptocompare"
+                        success_count += 1
+                        logger.info(f"Курс {our_symbol.upper()}: ${price:.2f} ({change:.2f}%)")
+        
+        return success_count > 0
+        
+    except Exception as e:
+        logger.error(f"Ошибка CryptoCompare API: {e}")
+        return False
+
+def _switch_api_source():
+    """Переключение между источниками API"""
+    sources = ["coingecko", "binance", "cryptocompare"]
+    current = api_cache["current_source"]
+    
+    try:
+        current_index = sources.index(current)
+        next_index = (current_index + 1) % len(sources)
+        api_cache["current_source"] = sources[next_index]
+    except ValueError:
+        api_cache["current_source"] = "coingecko"
+
+def _use_fallback_data():
+    """Использование резервных данных"""
+    current_time = datetime.now()
+    for symbol, data in FALLBACK_DATA.items():
+        crypto_prices[symbol]["price"] = data["price"]
+        crypto_prices[symbol]["change"] = data["change"]
+        crypto_prices[symbol]["last_update"] = current_time
+        crypto_prices[symbol]["source"] = data["source"]
+    logger.info("Использованы резервные данные курсов")
 
 def format_change_bar(percent_change):
     """Форматирование графического представления изменения цены"""
@@ -427,14 +643,16 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     current_date = datetime.now().strftime("%d.%m.%Y")
     
     # Получаем рыночные данные
-    market_text = "\n\n📊 *Курс криптовалют (обновлено в реальном времени):*\n"
+    market_text = "\n\n📊 *Курс криптовалют:*\n"
     
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
             change_text, bar = format_change_bar(price_data["change"])
             last_update = price_data["last_update"].strftime("%H:%M") if price_data["last_update"] else "N/A"
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\nОбновлено: {last_update}\n\n"
+            source = price_data.get("source", "unknown")
+            source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\nОбновлено: {last_update} {source_emoji}\n\n"
     
     # Формируем текст гороскопа
     text = (
@@ -671,45 +889,74 @@ def run_flask_server():
     app.run(host='0.0.0.0', port=port, threaded=True)
 
 def keep_alive():
-    """Регулярные запросы для поддержания активности"""
+    """Регулярные запросы для поддержания активности на Render"""
     while True:
         try:
+            # Получаем URL сервера
             server_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:10000')
             health_url = f"{server_url}/health"
-            response = requests.get(health_url, timeout=10)
-            logger.info(f"Keep-alive запрос: Status {response.status_code}")
+            
+            # Делаем запрос с таймаутом
+            response = requests.get(health_url, timeout=15)
+            
+            if response.status_code == 200:
+                logger.info(f"✅ Keep-alive успешен: {response.status_code}")
+            else:
+                logger.warning(f"⚠️ Keep-alive: неожиданный статус {response.status_code}")
+                
+        except requests.exceptions.Timeout:
+            logger.warning("⏰ Keep-alive: таймаут запроса")
+        except requests.exceptions.ConnectionError:
+            logger.error("🔌 Keep-alive: ошибка подключения")
         except Exception as e:
-            logger.error(f"Ошибка keep-alive: {e}")
-        time.sleep(10 * 60)  # 10 минут
+            logger.error(f"❌ Keep-alive ошибка: {e}")
+        
+        # Увеличиваем интервал до 14 минут для Render
+        time.sleep(14 * 60)  # 14 минут
 
 def main() -> None:
-    """Основная функция запуска бота"""
+    """Основная функция запуска бота с оптимизацией для Render"""
     if not BOT_TOKEN:
         logger.error("❌ BOT_TOKEN не установлен!")
         return
 
+    logger.info("🚀 Запуск AstroKit Bot...")
+    
+    # Загружаем кэш при запуске
+    logger.info("📂 Загрузка кэша...")
+    cache_loaded = load_cache_from_file()
+    
     # Инициализация курсов криптовалют
-    update_crypto_prices()
+    logger.info("📊 Инициализация курсов криптовалют...")
+    if not cache_loaded:
+        update_crypto_prices()
+    else:
+        logger.info("✅ Используем кэшированные данные")
     
     # Запуск Flask сервера в отдельном потоке
-    server_thread = threading.Thread(target=run_flask_server)
+    server_thread = threading.Thread(target=run_flask_server, name="FlaskServer")
     server_thread.daemon = True
     server_thread.start()
     logger.info(f"🌐 HTTP сервер запущен на порту {os.environ.get('PORT', 10000)}")
 
-    # Keep-alive для Render
-    if os.environ.get('RENDER'):
-        wakeup_thread = threading.Thread(target=keep_alive)
+    # Keep-alive для Render (только если запущено на Render)
+    is_render = os.environ.get('RENDER') or os.environ.get('RENDER_EXTERNAL_URL')
+    if is_render:
+        wakeup_thread = threading.Thread(target=keep_alive, name="KeepAlive")
         wakeup_thread.daemon = True
         wakeup_thread.start()
         logger.info("🔔 Keep-alive активирован (интервал: 14 минут)")
+    else:
+        logger.info("🏠 Локальный режим - keep-alive отключен")
 
     # Инициализация бота с JobQueue
+    logger.info("🤖 Инициализация Telegram бота...")
     application = Application.builder().token(BOT_TOKEN).build()
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
+    logger.info("✅ Обработчики зарегистрированы")
 
     # Задача для обновления курсов криптовалют каждые 5 минут
     if application.job_queue:
@@ -719,32 +966,46 @@ def main() -> None:
             name="crypto_update"
         )
         logger.info("📊 Обновление курсов криптовалют запланировано каждые 5 минут")
+        
+        # Задача для периодического сохранения кэша каждые 10 минут
+        application.job_queue.run_repeating(
+            lambda context: save_cache_to_file(),
+            interval=600,  # 10 минут
+            name="cache_save"
+        )
+        logger.info("💾 Автосохранение кэша запланировано каждые 10 минут")
 
     logger.info("🤖 Бот запущен! Ожидание сообщений...")
     
-    # Запуск с обработкой ошибок
+    # Запуск с улучшенной обработкой ошибок
     max_retries = 5
-    retry_delay = 14  # Увеличена начальная задержка
+    retry_delay = 30  # Увеличена начальная задержка для Render
     
     for attempt in range(max_retries):
         try:
+            logger.info(f"🔄 Попытка запуска {attempt+1}/{max_retries}")
             application.run_polling(
                 drop_pending_updates=True,
                 allowed_updates=Update.ALL_TYPES,
-                poll_interval=1.5,  # Увеличенный интервал для избежания конфликтов
-                close_loop=False
+                poll_interval=2.0,  # Увеличенный интервал для стабильности
+                close_loop=False,
+                timeout=30
             )
+            logger.info("✅ Бот успешно запущен")
             break
         except Conflict as e:
-            logger.error(f"Конфликт (попытка {attempt+1}/{max_retries}): {e}")
+            logger.error(f"⚠️ Конфликт (попытка {attempt+1}/{max_retries}): {e}")
             if attempt < max_retries - 1:
-                logger.info(f"Повтор через {retry_delay} секунд...")
+                logger.info(f"⏳ Повтор через {retry_delay} секунд...")
                 time.sleep(retry_delay)
-                retry_delay *= 1.5  # Экспоненциальная задержка
+                retry_delay = min(retry_delay * 2, 300)  # Экспоненциальная задержка с максимумом 5 минут
             else:
-                logger.error("Достигнут лимит повторов. Бот остановлен.")
+                logger.error("❌ Достигнут лимит повторов. Бот остановлен.")
         except Exception as e:
-            logger.error(f"Неожиданная ошибка: {e}")
+            logger.error(f"❌ Неожиданная ошибка: {e}")
+            if attempt < max_retries - 1:
+                logger.info(f"⏳ Повтор через {retry_delay} секунд...")
+                time.sleep(retry_delay)
             break
 
 if __name__ == "__main__":
