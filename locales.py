@@ -20,8 +20,8 @@ TEXTS = {
 
     # --- Start and Language Selection ---
     "language_select": {
-        "ru": "🇷🇺 Выберите язык:",
-        "en": "🇬🇧 Select your language:"
+        "ru": "Выберите язык",
+        "en": "Select your language"
     },
     "welcome": {
         "ru": (
@@ -140,6 +140,10 @@ TEXTS = {
     "premium_choice_contact": {
         "ru": "Для приобретения свяжитесь с @CryptoAstroSupport",
         "en": "To purchase, contact @CryptoAstroSupport"
+    },
+    "premium_price": {
+        "ru": "Стоимость",
+        "en": "Price"
     },
 
     # --- Generic Error ---
