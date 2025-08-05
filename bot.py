@@ -681,7 +681,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     text = (
         f"✨ *{display_zodiac} | {current_date}*\n\n"
         f"{horoscope_text}\n"
-        f"━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{market_text}"
     )
     
@@ -713,7 +713,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         tip_text = get_text('horoscope_unavailable', lang) # Re-using a generic error message
 
-    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    text = f" *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
     
     try:
         await context.bot.edit_message_text(
@@ -738,7 +738,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     status_key = "notifications_on" if notifications_on else "notifications_off"
     
     text = (
-        f"⚙️ *{get_text('settings_title', lang)}*\n\n"
+        f" *{get_text('settings_title', lang)}*\n\n"
         f"{get_text('notifications_status_line', lang).format(status=get_text(status_key, lang))}"
     )
     
