@@ -64,8 +64,8 @@ TEXTS = {
         "en": "Horoscope temporarily unavailable"
     },
     "market_rates_title": {
-        "ru": "\n\n📊 *Курс криптовалют:*",
-        "en": "\n\n📊 *Crypto Rates:*"
+        "ru": "\n\n📊 *Курс криптовалют:*\n",
+        "en": "\n\n📊 *Crypto Rates:*\n"
     },
     "updated_at": {
         "ru": "Обновлено",
