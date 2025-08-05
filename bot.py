@@ -7,10 +7,22 @@ import asyncio
 import random
 import json
 from datetime import datetime, date, timedelta
+import pytz
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue
 from telegram.error import TelegramError, BadRequest, Conflict
+from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP
+
+# --- Helper Functions ---
+
+def get_text(key: str, lang: str) -> str:
+    """Retrieves a text string in the specified language."""
+    return TEXTS.get(key, {}).get(lang, TEXTS.get(key, {}).get("ru", key))
+
+def get_user_lang(chat_id: int) -> str:
+    """Gets the user's selected language, defaulting to Russian."""
+    return get_user_data(chat_id).get("language", "ru")
 
 # Настройка логирования
 logging.basicConfig(
@@ -112,139 +124,121 @@ FALLBACK_DATA = {
     "ton": {"price": 7.50, "change": 2.5, "source": "fallback"}
 }
 
-# Генератор случайных гороскопов (улучшенные варианты)
-def generate_horoscopes():
+def generate_bilingual_horoscopes():
+    """Generates a database of horoscopes in both Russian and English."""
     themes = [
-        "инвестиции", "трейдинг", "стейкинг", "NFT", "DeFi", 
-        "майнинг", "ICO", "блокчейн", "смарт-контракты", "метавселенные",
-        "Web3", "GameFi", "DAO", "криптовалютные индексы", "стейблкоины"
+        {"ru": "инвестиции", "en": "investments"}, {"ru": "трейдинг", "en": "trading"},
+        {"ru": "стейкинг", "en": "staking"}, {"ru": "NFT", "en": "NFTs"},
+        {"ru": "DeFi", "en": "DeFi"}, {"ru": "майнинг", "en": "mining"}
     ]
     actions = [
-        "инвестируйте в", "избегайте", "изучите", "продавайте", "покупайте",
-        "холдите", "диверсифицируйте", "ребалансируйте", "анализируйте", "экспериментируйте с",
-        "рассмотрите возможность", "увеличьте позицию в", "сократите экспозицию на"
+        {"ru": "инвестируйте в", "en": "invest in"}, {"ru": "избегайте", "en": "avoid"},
+        {"ru": "изучите", "en": "study"}, {"ru": "продавайте", "en": "sell"},
+        {"ru": "покупайте", "en": "buy"}, {"ru": "холдите", "en": "HODL"}
     ]
     assets = [
-        "BTC", "TON", "ETH", "SOL", "DOGE", "мемкоины", "альткоины", "голубые фишки",
-        "новые проекты", "инфраструктурные токены", "L2 решения", "Oracle-проекты", 
-        "децентрализованные хранилища", "privacy-монеты"
+        "BTC", "TON", "ETH", "SOL", "DOGE", "memecoins", "altcoins", "blue chips",
+        "new projects", "infrastructure tokens", "L2 solutions"
     ]
     moods = [
-        "удачный день", "осторожный день", "рискованный период", "время возможностей",
-        "период стабильности", "время перемен", "момент для смелых решений",
-        "фаза накопления", "фаза распределения", "время для ходлинга"
+        {"ru": "удачный день", "en": "a lucky day"}, {"ru": "осторожный день", "en": "a cautious day"},
+        {"ru": "рискованный период", "en": "a risky period"}, {"ru": "время возможностей", "en": "a time of opportunity"}
     ]
     endings = [
-        "удача на вашей стороне", "будьте внимательны к деталям", "доверяйте интуиции",
-        "проверяйте информацию", "избегайте FOMO", "фиксируйте прибыль", "ищите скрытые возможности",
-        "контролируйте риски", "диверсификация - ключ к успеху", "не поддавайтесь панике"
+        {"ru": "удача на вашей стороне", "en": "luck is on your side"},
+        {"ru": "будьте внимательны к деталям", "en": "be attentive to details"},
+        {"ru": "доверяйте интуиции", "en": "trust your intuition"},
+        {"ru": "проверяйте информацию", "en": "verify information"}
     ]
-    
-    horoscopes = {}
-    for sign in ["Овен", "Телец", "Близнецы", "Рак", "Лев", "Дева", 
-                 "Весы", "Скорпион", "Стрелец", "Козерог", "Водолей", "Рыбы"]:
-        variants = []
-        for _ in range(30):  # 30 вариантов на каждый знак
-            theme = random.choice(themes)
-            action = random.choice(actions)
+
+    horoscopes = {"ru": {}, "en": {}}
+    zodiac_pairs = zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"])
+
+    for sign_ru, sign_en in zodiac_pairs:
+        variants_ru, variants_en = [], []
+        for _ in range(30):  # 30 variants for each sign
+            theme, action, mood, ending = random.choice(themes), random.choice(actions), random.choice(moods), random.choice(endings)
             asset = random.choice(assets)
-            mood = random.choice(moods)
-            ending = random.choice(endings)
-            
-            # Добавляем эмодзи для визуального разнообразия
             emoji = random.choice(["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡"])
-            
-            text = (
-                f"{emoji} *{sign}:*\n"
-                f"Сегодня *{mood}* для крипто-активов! Звезды советуют: "
-                f"*{action} {asset}.*\n"
-                f"Особое внимание уделите *{theme}*. {ending.capitalize()}!"
+
+            text_ru = (
+                f"{emoji} *{sign_ru}:*\n"
+                f"Сегодня *{mood['ru']}* для крипто-активов! Звезды советуют: "
+                f"*{action['ru']} {asset}.*\n"
+                f"Особое внимание уделите *{theme['ru']}*. {ending['ru'].capitalize()}!"
             )
-            variants.append(text)
-        horoscopes[sign] = variants
-    
+            text_en = (
+                f"{emoji} *{sign_en}:*\n"
+                f"Today is *{mood['en']}* for crypto assets! The stars advise: "
+                f"*{action['en']} {asset}.*\n"
+                f"Pay special attention to *{theme['en']}*. {ending['en'].capitalize()}!"
+            )
+            variants_ru.append(text_ru)
+            variants_en.append(text_en)
+
+        horoscopes["ru"][sign_ru] = variants_ru
+        horoscopes["en"][sign_en] = variants_en
+
     return horoscopes
 
-# Создаем базу гороскопов
-HOROSCOPES_DB = generate_horoscopes()
+HOROSCOPES_DB = generate_bilingual_horoscopes()
 
-# Обучающие материалы (добавлены новые советы)
-LEARNING_TIPS = [
-    "🔒 Всегда используйте аппаратные кошельки для хранения крупных сумм криптовалюты",
-    "🌐 Диверсифицируйте портфель между разными секторами крипторынка (DeFi, NFT, L1, AI, Gaming)",
-    "⏳ Помните про долгосрочную перспективу - стратегия HODL часто оказывается эффективнее активного трейдинга",
-    "📚 Изучайте технологию проекта перед инвестицией - не только цену токена и маркетинговые обещания",
-    "🛡️ Включайте двухфакторную аутентификацию на всех крипто-сервисах и никогда не делитесь сид-фразами",
-    "💸 Никогда не инвестируйте больше, чем можете позволить себе потерять без существенного ущерба",
-    "🌦️ Крипторынок цикличный - покупайте, когда все продают, и фиксируйте прибыль, когда все покупают",
-    "🔍 Всегда проверяйте контракты через блокчейн-эксплореры перед взаимодействием с новыми проектами",
-    "🧩 Разделяйте средства на холодное хранение, стейкинг и активные торговые операции",
-    "⚖️ Используйте стратегию риск-менеджмента: определяйте размер позиции и стоп-лоссы перед сделкой",
-    "📈 Анализируйте рыночные тренды - не действуйте против тренда без веских причин",
-    "💡 Обучайтесь постоянно - крипторынок развивается очень быстро, и вчерашние стратегии могут не работать сегодня",
-    "🌙 Избегайте эмоциональных решений - FOMO (Fear Of Missing Out) и FUD (Fear, Uncertainty, Doubt) - главные враги инвестора",
-    "🔄 Ребалансируйте портфель раз в квартал - это помогает зафиксировать прибыль и снизить риски",
-    "🔎 Проверяйте репутацию проектов - читайте отзывы, изучайте команду, ищите аудиты безопасности",
-    "🚀 Начинайте с малого - не вкладывайте крупные суммы в неизученные активы",
-    "🛡️ Используйте разные пароли для каждого сервиса - менеджер паролей поможет вам их запомнить",
-    "💎 Обращайте внимание на ликвидность - не инвестируйте в активы, которые сложно продать",
-    "🌍 Следите за глобальными экономическими новостями - они сильно влияют на крипторынок",
-    "⏱️ Таймфрейм имеет значение - определяйте свои инвестиционные горизонты заранее",
-    "📉 Используйте DCA (усреднение стоимости) для снижения рисков при входах в позицию",
-    "🔐 Регулярно обновляйте софт кошельков и используйте только проверенные приложения",
-    "🌐 Изучайте основы блокчейна - понимание технологии поможет принимать более обоснованные решения",
-    "💼 Рассмотрите возможность создания нескольких портфелей с разными стратегиями"
-]
-
-# Премиум функции (обновленные цены)
 PREMIUM_OPTIONS = {
     "tomorrow": {
-        "title": "🔮 Завтрашний прогноз",
-        "description": "Узнайте, что ждет ваш портфель завтра",
+        "title": {"ru": "🔮 Завтрашний прогноз", "en": "🔮 Tomorrow's Forecast"},
+        "description": {"ru": "Узнайте, что ждет ваш портфель завтра", "en": "Find out what awaits your portfolio tomorrow"},
         "price": "2$"
     },
     "weekly": {
-        "title": "📅 Прогноз на неделю",
-        "description": "Планируйте свою стратегию на всю неделю",
+        "title": {"ru": "📅 Прогноз на неделю", "en": "📅 Weekly Forecast"},
+        "description": {"ru": "Планируйте свою стратегию на всю неделю", "en": "Plan your strategy for the whole week"},
         "price": "5$"
     },
     "permanent": {
-        "title": "💎 Постоянный доступ",
-        "description": "Ежедневные прогнозы и эксклюзивные аналитические материалы",
+        "title": {"ru": "💎 Постоянный доступ", "en": "💎 Permanent Access"},
+        "description": {"ru": "Ежедневные прогнозы и эксклюзивные аналитические материалы", "en": "Daily forecasts and exclusive analytical materials"},
         "price": "7$/мес"
     }
 }
 
-def get_user_data(chat_id):
-    """Получение или создание данных пользователя"""
+daily_data = {
+    "advice": {
+        "ru": get_text("daily_data_advice_fallback", "ru"),
+        "en": get_text("daily_data_advice_fallback", "en")
+    },
+    "horoscopes": {
+        "ru": {sign: get_text("daily_data_horoscope_fallback", "ru") for sign in ZODIAC_SIGNS["ru"]},
+        "en": {sign: get_text("daily_data_horoscope_fallback", "en") for sign in ZODIAC_SIGNS["en"]}
+    }
+}
+
+def update_daily_data(context: ContextTypes.DEFAULT_TYPE = None):
+    """Updates the daily advice and horoscopes for all signs in both languages."""
+    logger.info("Starting daily update of advice and horoscopes...")
+
+    # Choose a random tip for the day
+    daily_data["advice"]["ru"] = random.choice(TEXTS["learning_tips"]["ru"])
+    daily_data["advice"]["en"] = random.choice(TEXTS["learning_tips"]["en"])
+
+    # Choose random horoscopes for each sign
+    for sign_ru, sign_en in zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"]):
+        daily_data["horoscopes"]["ru"][sign_ru] = random.choice(HOROSCOPES_DB["ru"][sign_ru])
+        daily_data["horoscopes"]["en"][sign_en] = random.choice(HOROSCOPES_DB["en"][sign_en])
+
+    logger.info("✅ Daily advice and horoscopes updated successfully.")
+
+def get_user_data(chat_id: int) -> dict:
+    """Gets or creates a user's data entry."""
     if chat_id not in user_data:
         user_data[chat_id] = {
+            "language": None,  # 'ru' or 'en'
             "notifications": True,
-            "last_horoscope_date": None,
-            "horoscopes": {},
-            "advice": None,
-            "notification_time": "09:00"  # По умолчанию в 9:00
+            "last_horoscope_date": None,  # Obsolete, will be removed
+            "horoscopes": {},             # Obsolete, will be removed
+            "advice": None,               # Obsolete, will be removed
+            "notification_time": "09:00"  # Obsolete, will be removed
         }
     return user_data[chat_id]
-
-def update_user_horoscope(chat_id):
-    """Обновление гороскопа для конкретного пользователя"""
-    user_info = get_user_data(chat_id)
-    today = date.today()
-    
-    # Проверяем, нужно ли обновить гороскоп (прошло 24 часа)
-    if user_info["last_horoscope_date"] != today:
-        logger.info(f"Обновление гороскопа для пользователя {chat_id}")
-        user_info["last_horoscope_date"] = today
-        
-        # Выбираем случайный совет дня для пользователя
-        user_info["advice"] = random.choice(LEARNING_TIPS)
-        
-        # Выбираем случайные гороскопы для каждого знака для этого пользователя
-        for sign, variants in HOROSCOPES_DB.items():
-            user_info["horoscopes"][sign] = random.choice(variants)
-        
-        logger.info(f"Гороскоп обновлен для пользователя {chat_id} на {today}")
 
 def update_crypto_prices():
     """Обновляет курсы криптовалют в реальном времени с множественными источниками"""
@@ -450,201 +444,213 @@ def format_change_bar(percent_change):
     color = "🟢" if percent_change >= 0 else "🔴"
     return f"{color} {symbol}{abs(percent_change):.1f}%", bar
 
-def main_menu_keyboard():
-    """Клавиатура главного меню"""
+def main_menu_keyboard(lang: str):
+    """Creates the main menu keyboard in the specified language."""
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🔮 Гороскоп", callback_data="horoscope_menu")
+            InlineKeyboardButton(get_text("horoscope_button", lang), callback_data="horoscope_menu")
         ],
         [
-            InlineKeyboardButton("💡 Совет дня", callback_data="learning_tip"),
-            InlineKeyboardButton("⚙️ Настройки", callback_data="settings_menu")
+            InlineKeyboardButton(get_text("tip_button", lang), callback_data="learning_tip"),
+            InlineKeyboardButton(get_text("settings_button", lang), callback_data="settings_menu")
         ],
         [
-            InlineKeyboardButton("💎 Премиум", callback_data="premium_menu")
+            InlineKeyboardButton(get_text("premium_button", lang), callback_data="premium_menu")
         ]
     ])
 
-def back_to_menu_keyboard():
-    """Клавиатура с кнопкой возврата"""
+def back_to_menu_keyboard(lang: str):
+    """Creates a back button in the specified language."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Назад", callback_data="main_menu")]
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ])
 
-def zodiac_keyboard():
-    """Клавиатура выбора знака зодиака (4x3)"""
-    zodiacs = list(HOROSCOPES_DB.keys())
+def zodiac_keyboard(lang: str):
+    """Creates the zodiac selection keyboard in the specified language."""
+    zodiacs = ZODIAC_SIGNS[lang]
+    original_zodiacs = ZODIAC_SIGNS["ru"] # Callbacks use Russian names
     buttons = []
     
-    # Разбиваем на ряды по 3 кнопки
+    # Create rows of 3 buttons
     for i in range(0, len(zodiacs), 3):
         row = zodiacs[i:i+3]
+        original_row = original_zodiacs[i:i+3]
         buttons.append([
-            InlineKeyboardButton(zod, callback_data=f"zodiac_{zod}") 
-            for zod in row
+            InlineKeyboardButton(zod, callback_data=f"zodiac_{orig_zod}")
+            for zod, orig_zod in zip(row, original_row)
         ])
     
-    # Добавляем кнопку Назад
-    buttons.append([InlineKeyboardButton("⬅️ Назад", callback_data="main_menu")])
+    # Add back button
+    buttons.append([InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")])
     
     return InlineKeyboardMarkup(buttons)
 
-def settings_keyboard(chat_id):
-    """Клавиатура настроек"""
-    # Получаем текущий статус уведомлений
+def settings_keyboard(chat_id: int, lang: str):
+    """Creates the settings keyboard in the specified language."""
     user_info = get_user_data(chat_id)
     notifications_on = user_info.get("notifications", True)
     
-    toggle_text = "🔕 Выключить уведомления" if notifications_on else "🔔 Включить уведомления"
+    toggle_key = "toggle_notifications_off_button" if notifications_on else "toggle_notifications_on_button"
+    toggle_text = get_text(toggle_key, lang)
     
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
-        [InlineKeyboardButton("⬅️ Назад", callback_data="main_menu")]
+        [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ])
 
-def premium_menu_keyboard():
-    """Клавиатура премиум меню"""
+def premium_menu_keyboard(lang: str):
+    """Creates the premium menu keyboard in the specified language."""
     buttons = [
         [InlineKeyboardButton(
-            f"{opt['title']} ({opt['price']})", 
+            f"{opt['title'][lang]} ({opt['price']})",
             callback_data=f"premium_{option}"
         )] for option, opt in PREMIUM_OPTIONS.items()
     ]
-    buttons.append([InlineKeyboardButton("⬅️ Назад", callback_data="main_menu")])
+    buttons.append([InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")])
     return InlineKeyboardMarkup(buttons)
 
+def language_keyboard():
+    """Returns the language selection keyboard."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🇷🇺 Русский", callback_data="set_lang_ru"),
+            InlineKeyboardButton("🇬🇧 English", callback_data="set_lang_en"),
+        ]
+    ])
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик команды /start"""
+    """Handler for the /start command."""
     user = update.effective_user
     chat_id = update.effective_chat.id
+    user_info = get_user_data(chat_id)
+
+    if user_info.get("language") is None:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=get_text("language_select", "ru"),  # Send in both languages initially
+            reply_markup=language_keyboard()
+        )
+        return
+
+    lang = user_info["language"]
     
-    # Инициализация данных пользователя
-    get_user_data(chat_id)
-    
-    # Обновляем гороскоп для пользователя
-    update_user_horoscope(chat_id)
-    
-    # Обновляем курсы криптовалют
+    # Update crypto prices
     update_crypto_prices()
     
-    # Приветственное сообщение
-    text = (
-        f"✨ *Добро пожаловать в AstroKit, {user.first_name}!* ✨\n\n"
-        "🌟 Ваш персональный крипто-астролог!\n"
-        "📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\n\n"
-        "Выбери интересующий раздел, но перед этим ознакомься с [пользовательским соглашением](https://example.com/tos)."
-    )
+    # Welcome message
+    welcome_text = get_text("welcome", lang).format(first_name=user.first_name)
     
     await context.bot.send_message(
         chat_id=chat_id,
-        text=text,
-        reply_markup=main_menu_keyboard(),
+        text=welcome_text,
+        reply_markup=main_menu_keyboard(lang),
         parse_mode="Markdown",
         disable_web_page_preview=True
     )
     
-    # Запуск уведомлений, если они включены
-    user_info = get_user_data(chat_id)
+    # Schedule notifications if enabled
     if user_info["notifications"] and context.job_queue:
-        # Планируем уведомления на указанное время
-        schedule_user_notifications(context.job_queue, chat_id, user_info["notification_time"])
-        logger.info(f"Уведомления активированы для пользователя {chat_id}")
+        schedule_user_notifications(context.job_queue, chat_id)
+        logger.info(f"Notifications activated for user {chat_id}")
 
-def schedule_user_notifications(job_queue, chat_id, notification_time):
-    """Планирование уведомлений для пользователя на указанное время"""
+async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Callback handler for language selection."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = query.message.chat_id
+    user_info = get_user_data(chat_id)
+    lang = query.data.split("_")[-1]  # 'ru' or 'en'
+    user_info["language"] = lang
+
+    # Show the main menu in the selected language
+    await show_main_menu(update, context)
+
+def schedule_user_notifications(job_queue, chat_id):
+    """Планирование ежечасных уведомлений для пользователя"""
     try:
-        # Парсим время уведомлений (формат "HH:MM")
-        hour, minute = map(int, notification_time.split(":"))
-        
-        # Удаляем существующие задачи для этого пользователя
+        # Удаляем существующие задачи для этого пользователя, чтобы избежать дублирования
         current_jobs = job_queue.get_jobs_by_name(f"notification_{chat_id}")
         for job in current_jobs:
             job.schedule_removal()
         
-        # Создаем новую задачу на указанное время
-        job_queue.run_daily(
+        # Создаем новую задачу, которая повторяется каждый час
+        job_queue.run_repeating(
             send_notification,
-            time=time(hour, minute),
+            interval=3600,  # 3600 секунд = 1 час
+            first=1,  # Запустить через 1 секунду после вызова
             chat_id=chat_id,
             name=f"notification_{chat_id}"
         )
-        logger.info(f"Уведомления запланированы для {chat_id} на {notification_time}")
+        logger.info(f"Ежечасные уведомления запланированы для {chat_id}")
     except Exception as e:
         logger.error(f"Ошибка планирования уведомлений для {chat_id}: {e}")
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показ главного меню"""
+    """Shows the main menu."""
     query = update.callback_query
     chat_id = query.message.chat_id if query else update.effective_chat.id
-    
-    # Обновляем данные пользователя
-    update_user_horoscope(chat_id)
+    lang = get_user_lang(chat_id)
+
     update_crypto_prices()
     
-    text = (
-        "✨ *Главное меню* ✨\n\n"
-        "Выберите интересующий раздел:"
-    )
+    text = get_text("main_menu_title", lang)
     
     try:
         if query:
+            # Edit the message if it's a callback query
             await context.bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=query.message.message_id,
                 text=text,
-                reply_markup=main_menu_keyboard(),
+                reply_markup=main_menu_keyboard(lang),
                 parse_mode="Markdown"
             )
         else:
+            # Send a new message if it's a command
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=text,
-                reply_markup=main_menu_keyboard(),
+                reply_markup=main_menu_keyboard(lang),
                 parse_mode="Markdown"
             )
     except BadRequest as e:
-        logger.error(f"Ошибка при показе главного меню: {e}")
+        logger.error(f"Error showing main menu: {e}")
 
 async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показ меню выбора знака зодиака"""
+    """Shows the zodiac sign selection menu."""
     query = update.callback_query
     await query.answer()
     
-    # Обновляем данные пользователя
     chat_id = query.message.chat_id
-    update_user_horoscope(chat_id)
+    lang = get_user_lang(chat_id)
     
     try:
         await context.bot.edit_message_text(
-            chat_id=query.message.chat_id,
+            chat_id=chat_id,
             message_id=query.message.message_id,
-            text="♈ *Выберите ваш знак зодиака:*",
-            reply_markup=zodiac_keyboard(),
+            text=get_text("zodiac_select_title", lang),
+            reply_markup=zodiac_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
-        logger.error(f"Ошибка при показе меню гороскопа: {e}")
+        logger.error(f"Error showing horoscope menu: {e}")
 
 async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TYPE, zodiac: str) -> None:
-    """Показ гороскопа для выбранного знака"""
+    """Shows the horoscope for the selected zodiac sign."""
     query = update.callback_query
     await query.answer()
     
     chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
     
-    # Обновляем данные пользователя
-    update_user_horoscope(chat_id)
     update_crypto_prices()
     
-    # Получаем данные пользователя
-    user_info = get_user_data(chat_id)
-    
-    # Получаем текущую дату
     current_date = datetime.now().strftime("%d.%m.%Y")
     
-    # Получаем рыночные данные
-    market_text = "\n\n📊 *Курс криптовалют:*\n"
-    
+    # Get market data text
+    market_text = get_text("market_rates_title", lang)
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
@@ -652,70 +658,17 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             last_update = price_data["last_update"].strftime("%H:%M") if price_data["last_update"] else "N/A"
             source = price_data.get("source", "unknown")
             source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\nОбновлено: {last_update} {source_emoji}\n\n"
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n{get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
     
-    # Формируем текст гороскопа
+    # Get the translated zodiac sign name for display
+    display_zodiac = zodiac if lang == "ru" else ZODIAC_CALLBACK_MAP.get(zodiac, zodiac)
+    horoscope_text = daily_data['horoscopes'][lang].get(display_zodiac, get_text('horoscope_unavailable', lang))
+
     text = (
-        f"✨ *{zodiac} | {current_date}*\n\n"
-        f"{user_info['horoscopes'].get(zodiac, 'Гороскоп временно недоступен')}\n"
+        f"✨ *{display_zodiac} | {current_date}*\n\n"
+        f"{horoscope_text}\n"
         f"━━━━━━━━━━━━━━\n"
         f"{market_text}"
-    )
-    
-    try:
-        await context.bot.edit_message_text(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            text=text,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
-            ]),
-            parse_mode="Markdown"
-        )
-    except BadRequest as e:
-        logger.error(f"Ошибка при показе гороскопа: {e}")
-
-async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показ обучающего совета"""
-    query = update.callback_query
-    await query.answer()
-    
-    chat_id = query.message.chat_id
-    
-    # Обновляем данные пользователя
-    update_user_horoscope(chat_id)
-    
-    # Получаем данные пользователя
-    user_info = get_user_data(chat_id)
-    
-    text = f"💡 *Совет дня*\n\n🌟 {user_info['advice']}"
-    
-    try:
-        await context.bot.edit_message_text(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            text=text,
-            reply_markup=back_to_menu_keyboard(),
-            parse_mode="Markdown"
-        )
-    except BadRequest as e:
-        logger.error(f"Ошибка при показе совета: {e}")
-
-async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показ меню настроек"""
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat_id
-    
-    # Получаем данные пользователя
-    user_info = get_user_data(chat_id)
-    notifications_status = "включены ✅" if user_info.get("notifications", True) else "выключены ❌"
-    
-    text = (
-        "⚙️ *Настройки уведомлений*\n\n"
-        f"🔔 Текущий статус: {notifications_status}\n"
-        f"⏰ Время уведомлений: {user_info.get('notification_time', '09:00')}\n\n"
-        "Управляйте астро-оповещениями:"
     )
     
     try:
@@ -723,11 +676,71 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=settings_keyboard(chat_id),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(get_text('main_menu_button', lang), callback_data='main_menu')]]),
             parse_mode="Markdown"
         )
     except BadRequest as e:
-        logger.error(f"Ошибка при показе настроек: {e}")
+        logger.error(f"Error showing zodiac horoscope: {e}")
+
+async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shows the tip of the day."""
+    query = update.callback_query
+    await query.answer()
+    
+    chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
+    
+    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {daily_data['advice'][lang]}"
+    
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=text,
+            reply_markup=back_to_menu_keyboard(lang),
+            parse_mode="Markdown"
+        )
+    except BadRequest as e:
+        logger.error(f"Error showing learning tip: {e}")
+
+async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shows the settings menu."""
+    query = update.callback_query
+    await query.answer()
+    chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
+    
+    user_info = get_user_data(chat_id)
+    notifications_on = user_info.get("notifications", True)
+    status_key = "notifications_on" if notifications_on else "notifications_off"
+    
+    text = (
+        f"⚙️ *{get_text('settings_title', lang)}*\n\n"
+        f"{get_text('notifications_status_line', lang).format(status=get_text(status_key, lang))}"
+    )
+    
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=text,
+            reply_markup=settings_keyboard(chat_id, lang),
+            parse_mode="Markdown"
+        )
+    except BadRequest as e:
+        logger.error(f"Error showing settings menu: {e}")
+
+async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shows the language selection menu."""
+    query = update.callback_query
+    await query.answer()
+
+    await context.bot.edit_message_text(
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id,
+        text=get_text("language_select", "ru"), # Show in both languages
+        reply_markup=language_keyboard()
+    )
 
 async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Переключение уведомлений"""
@@ -745,7 +758,7 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
     # Обновляем или удаляем задачу
     if new_status and context.job_queue:
         # Создаем новую задачу
-        schedule_user_notifications(context.job_queue, chat_id, user_info["notification_time"])
+        schedule_user_notifications(context.job_queue, chat_id)
         logger.info(f"Уведомления включены для {chat_id}")
     elif not new_status and context.job_queue:
         # Удаляем существующую задачу
@@ -758,22 +771,13 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
     await show_settings_menu(update, context)
 
 async def send_notification(context: ContextTypes.DEFAULT_TYPE):
-    """Отправка уведомления и его удаление через 10 секунд"""
+    """Sends a notification to a user in their selected language and deletes it after 10 minutes."""
     job = context.job
     chat_id = job.chat_id
+    lang = get_user_lang(chat_id)
     
-    # Выбираем случайное уведомление
-    alerts = [
-        "⚠️ *АСТРО-ТРЕВОГА!*\n\nМеркурий ретроградный → Ожидайте технических сбоев на биржах и кошельках. Рекомендуется отложить крупные транзакции!",
-        "🌟 *ЗВЕЗДНАЯ ВОЗМОЖНОСТЬ!*\n\nЮпитер входит в знак Стрельца → Благоприятный период для долгосрочных инвестиций!",
-        "🔮 *ПРЕДУПРЕЖДЕНИЕ!*\n\nЛуна в Скорпионе → Повышенная волатильность на рынке! Будьте осторожны с кредитным плечом.",
-        "💫 *АСТРО-ПРОГНОЗ!*\n\nВенера сближается с Сатурном → Идеальное время для ребалансировки портфеля!",
-        "🌕 *ОСОБЫЙ ПЕРИОД!*\n\nПолнолуние в Водолее → Ожидайте неожиданных рыночных движений! Готовьтесь к возможным коррекциям.",
-        "🌌 *КОСМИЧЕСКИЙ СОВЕТ!*\n\nМарс в соединении с Ураном → Идеальное время для инновационных инвестиций и изучения новых технологий!",
-        "🪐 *ПЛАНЕТАРНЫЙ ПРОГНОЗ!*\n\nНептун в трине с Плутоном → Остерегайтесь скрытых рисков и мошеннических схем на рынке!"
-    ]
-    
-    alert = random.choice(alerts)
+    # Choose a random alert in the user's language
+    alert = random.choice(TEXTS["notification_alerts"][lang])
     
     try:
         message = await context.bot.send_message(
@@ -782,73 +786,75 @@ async def send_notification(context: ContextTypes.DEFAULT_TYPE):
             parse_mode="Markdown"
         )
         
-        # Запланировать удаление через 10 секунд
-        await asyncio.sleep(10)
+        # Schedule deletion after 10 minutes
+        await asyncio.sleep(600)
         await context.bot.delete_message(
             chat_id=chat_id,
             message_id=message.message_id
         )
-        logger.info(f"Уведомление отправлено и удалено для {chat_id}")
+        logger.info(f"Notification sent and deleted for {chat_id}")
     except Exception as e:
-        logger.error(f"Ошибка отправки уведомления: {e}")
+        logger.error(f"Error sending notification: {e}")
 
 async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Показ премиум меню"""
+    """Shows the premium menu."""
     query = update.callback_query
     await query.answer()
     
+    chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
+
     text = (
-        "💎 *Премиум доступ*\n\n"
-        "Расширьте свои возможности с премиум подпиской:\n\n"
-        "• 🔮 Эксклюзивные астропрогнозы\n"
-        "• 📊 Расширенный рыночный анализ\n"
-        "• 💼 Персональные инвестиционные рекомендации\n"
-        "• 🚀 Приоритетная поддержка\n\n"
-        "Выберите вариант:"
+        f"💎 *{get_text('premium_menu_title', lang)}*\n\n"
+        f"{get_text('premium_menu_description', lang)}"
     )
     
     try:
         await context.bot.edit_message_text(
-            chat_id=query.message.chat_id,
+            chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=premium_menu_keyboard(),
+            reply_markup=premium_menu_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
-        logger.error(f"Ошибка при показе премиум меню: {e}")
+        logger.error(f"Error showing premium menu: {e}")
 
 async def handle_premium_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, option: str) -> None:
-    """Обработка выбора премиум опции"""
+    """Handles a premium option selection."""
     query = update.callback_query
     await query.answer()
     
+    chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
+
     if option not in PREMIUM_OPTIONS:
         return
     
     selected = PREMIUM_OPTIONS[option]
     text = (
-        f"✨ *{selected['title']}* ✨\n\n"
-        f"📝 {selected['description']}\n\n"
+        f"✨ *{selected['title'][lang]}* ✨\n\n"
+        f"📝 {selected['description'][lang]}\n\n"
         f"💎 *Стоимость:* {selected['price']}\n\n"
-        "Для приобретения свяжитесь с @CryptoAstroSupport"
+        f"{get_text('premium_choice_contact', lang)}"
     )
     
     try:
         await context.bot.edit_message_text(
-            chat_id=query.message.chat_id,
+            chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(),
+            reply_markup=back_to_menu_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
-        logger.error(f"Ошибка при обработке премиум выбора: {e}")
+        logger.error(f"Error handling premium choice: {e}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Обработчик нажатий на кнопки"""
+    """Main callback query handler."""
     query = update.callback_query
     data = query.data
+    lang = get_user_lang(query.message.chat_id)
     
     try:
         if data == "main_menu":
@@ -869,9 +875,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         elif data.startswith("premium_"):
             option = data.split("_")[1]
             await handle_premium_choice(update, context, option)
+        elif data.startswith("set_lang_"):
+            await set_language(update, context)
+        elif data == "change_language":
+            await change_language(update, context)
+
     except Exception as e:
-        logger.error(f"Ошибка обработчика кнопок: {e}")
-        await query.answer("⚠️ Произошла ошибка. Попробуйте позже.")
+        logger.error(f"Error in button handler: {e}")
+        await query.answer(get_text("error_occurred", lang))
 
 def run_flask_server():
     """Запуск Flask-сервера для Render"""
@@ -949,6 +960,10 @@ def main() -> None:
     else:
         logger.info("🏠 Локальный режим - keep-alive отключен")
 
+    # Инициализация ежедневных данных при запуске
+    update_daily_data()
+    logger.info("✅ Первоначальные ежедневные данные сгенерированы.")
+
     # Инициализация бота с JobQueue
     logger.info("🤖 Инициализация Telegram бота...")
     application = Application.builder().token(BOT_TOKEN).build()
@@ -958,22 +973,33 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(button_handler))
     logger.info("✅ Обработчики зарегистрированы")
 
-    # Задача для обновления курсов криптовалют каждые 5 минут
+    # Задачи JobQueue
     if application.job_queue:
+        # Обновление курсов криптовалют каждые 5 минут
         application.job_queue.run_repeating(
             lambda context: update_crypto_prices(),
-            interval=300,  # 5 минут
+            interval=300,
             name="crypto_update"
         )
         logger.info("📊 Обновление курсов криптовалют запланировано каждые 5 минут")
         
-        # Задача для периодического сохранения кэша каждые 10 минут
+        # Периодическое сохранение кэша каждые 10 минут
         application.job_queue.run_repeating(
             lambda context: save_cache_to_file(),
-            interval=600,  # 10 минут
+            interval=600,
             name="cache_save"
         )
         logger.info("💾 Автосохранение кэша запланировано каждые 10 минут")
+
+        # Ежедневное обновление гороскопов в 07:00 по Москве
+        moscow_tz = pytz.timezone("Europe/Moscow")
+        job_time = datetime.strptime("07:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        application.job_queue.run_daily(
+            update_daily_data,
+            time=job_time,
+            name="daily_data_update"
+        )
+        logger.info("📅 Ежедневное обновление гороскопов запланировано на 07:00 по Москве")
 
     logger.info("🤖 Бот запущен! Ожидание сообщений...")
     
