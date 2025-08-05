@@ -526,9 +526,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_info = get_user_data(chat_id)
 
     if user_info.get("language") is None:
+        lang_prompt = f"🇷🇺 {get_text('language_select', 'ru')} / 🇬🇧 {get_text('language_select', 'en')}"
         await context.bot.send_message(
             chat_id=chat_id,
-            text=get_text("language_select", "ru"),  # Send in both languages initially
+            text=lang_prompt,
             reply_markup=language_keyboard()
         )
         return
@@ -679,7 +680,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
         horoscope_text = get_text('horoscope_unavailable', lang)
 
     text = (
-        f"✨ *{display_zodiac} | {current_date}*\n\n"
+        f"*{display_zodiac} | {current_date}*\n\n"
         f"{horoscope_text}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{market_text}"
@@ -758,10 +759,11 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
+    lang_prompt = f"🇷🇺 {get_text('language_select', 'ru')} / 🇬🇧 {get_text('language_select', 'en')}"
     await context.bot.edit_message_text(
         chat_id=query.message.chat_id,
         message_id=query.message.message_id,
-        text=get_text("language_select", "ru"), # Show in both languages
+        text=lang_prompt,
         reply_markup=language_keyboard()
     )
 
@@ -856,9 +858,9 @@ async def handle_premium_choice(update: Update, context: ContextTypes.DEFAULT_TY
     
     selected = PREMIUM_OPTIONS[option]
     text = (
-        f"✨ *{selected['title'][lang]}* ✨\n\n"
+        f"✨ *{selected['title'][lang]}*\n\n"
         f"📝 {selected['description'][lang]}\n\n"
-        f"💎 *Стоимость:* {selected['price']}\n\n"
+        f"💎 *{get_text('premium_price', lang)}:* {selected['price']}\n\n"
         f"{get_text('premium_choice_contact', lang)}"
     )
     
