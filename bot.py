@@ -682,7 +682,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     text = (
         f"*{display_zodiac} | {current_date}*\n\n"
         f"{horoscope_text}\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{market_text}"
     )
     
