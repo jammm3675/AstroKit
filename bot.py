@@ -201,44 +201,44 @@ PREMIUM_OPTIONS = {
     }
 }
 
-daily_data = {
-    "advice": {
-        "ru": get_text("daily_data_advice_fallback", "ru"),
-        "en": get_text("daily_data_advice_fallback", "en")
-    },
-    "horoscopes": {
-        "ru": {sign: get_text("daily_data_horoscope_fallback", "ru") for sign in ZODIAC_SIGNS["ru"]},
-        "en": {sign: get_text("daily_data_horoscope_fallback", "en") for sign in ZODIAC_SIGNS["en"]}
-    }
-}
-
-def update_daily_data(context: ContextTypes.DEFAULT_TYPE = None):
-    """Updates the daily advice and horoscopes for all signs in both languages."""
-    logger.info("Starting daily update of advice and horoscopes...")
-
-    # Choose a random tip for the day
-    daily_data["advice"]["ru"] = random.choice(TEXTS["learning_tips"]["ru"])
-    daily_data["advice"]["en"] = random.choice(TEXTS["learning_tips"]["en"])
-
-    # Choose random horoscopes for each sign
-    for sign_ru, sign_en in zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"]):
-        daily_data["horoscopes"]["ru"][sign_ru] = random.choice(HOROSCOPES_DB["ru"][sign_ru])
-        daily_data["horoscopes"]["en"][sign_en] = random.choice(HOROSCOPES_DB["en"][sign_en])
-
-    logger.info("✅ Daily advice and horoscopes updated successfully.")
 
 def get_user_data(chat_id: int) -> dict:
     """Gets or creates a user's data entry."""
     if chat_id not in user_data:
         user_data[chat_id] = {
-            "language": None,  # 'ru' or 'en'
+            "language": None,
             "notifications": True,
-            "last_horoscope_date": None,  # Obsolete, will be removed
-            "horoscopes": {},             # Obsolete, will be removed
-            "advice": None,               # Obsolete, will be removed
-            "notification_time": "09:00"  # Obsolete, will be removed
+            "last_update": None,
+            "tip_index": None,
+            "horoscope_indices": {}
         }
     return user_data[chat_id]
+
+def update_user_horoscope(chat_id: int):
+    """
+    Checks if the user's daily content is outdated and regenerates it if necessary.
+    This function ensures that a user gets a new random tip and set of horoscopes once per day.
+    It stores indices to ensure content is consistent across language changes.
+    """
+    user_info = get_user_data(chat_id)
+    today = date.today()
+
+    if user_info.get("last_update") != today:
+        logger.info(f"Updating daily content for user {chat_id}")
+        user_info["last_update"] = today
+
+        # Select a random index for the learning tip
+        num_tips = len(TEXTS["learning_tips"]["ru"])  # Both languages have the same number of tips
+        user_info["tip_index"] = random.randint(0, num_tips - 1)
+
+        # Select random indices for each zodiac sign's horoscope
+        horoscope_indices = {}
+        for sign_ru in ZODIAC_SIGNS["ru"]:
+            num_variants = len(HOROSCOPES_DB["ru"][sign_ru])
+            horoscope_indices[sign_ru] = random.randint(0, num_variants - 1)
+        user_info["horoscope_indices"] = horoscope_indices
+
+        logger.info(f"Content indices updated for user {chat_id} for {today}")
 
 def update_crypto_prices():
     """Обновляет курсы криптовалют в реальном времени с множественными источниками"""
@@ -535,6 +535,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
     lang = user_info["language"]
     
+    # Update user's daily content if needed
+    update_user_horoscope(chat_id)
+
     # Update crypto prices
     update_crypto_prices()
     
@@ -593,6 +596,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     chat_id = query.message.chat_id if query else update.effective_chat.id
     lang = get_user_lang(chat_id)
 
+    update_user_horoscope(chat_id)
     update_crypto_prices()
     
     text = get_text("main_menu_title", lang)
@@ -625,6 +629,8 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
+
+    update_user_horoscope(chat_id)
     
     try:
         await context.bot.edit_message_text(
@@ -659,10 +665,18 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             source = price_data.get("source", "unknown")
             source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
             market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n{get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
-    
+
     # Get the translated zodiac sign name for display
     display_zodiac = zodiac if lang == "ru" else ZODIAC_CALLBACK_MAP.get(zodiac, zodiac)
-    horoscope_text = daily_data['horoscopes'][lang].get(display_zodiac, get_text('horoscope_unavailable', lang))
+
+    # Get the horoscope text using the stored index for the user
+    user_info = get_user_data(chat_id)
+    horoscope_index = user_info["horoscope_indices"].get(zodiac)
+
+    if horoscope_index is not None:
+        horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index]
+    else:
+        horoscope_text = get_text('horoscope_unavailable', lang)
 
     text = (
         f"✨ *{display_zodiac} | {current_date}*\n\n"
@@ -690,7 +704,16 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
     
-    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {daily_data['advice'][lang]}"
+    # Get the tip of the day using the stored index for the user
+    user_info = get_user_data(chat_id)
+    tip_index = user_info.get("tip_index")
+
+    if tip_index is not None:
+        tip_text = TEXTS["learning_tips"][lang][tip_index]
+    else:
+        tip_text = get_text('horoscope_unavailable', lang) # Re-using a generic error message
+
+    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
     
     try:
         await context.bot.edit_message_text(
@@ -960,10 +983,6 @@ def main() -> None:
     else:
         logger.info("🏠 Локальный режим - keep-alive отключен")
 
-    # Инициализация ежедневных данных при запуске
-    update_daily_data()
-    logger.info("✅ Первоначальные ежедневные данные сгенерированы.")
-
     # Инициализация бота с JobQueue
     logger.info("🤖 Инициализация Telegram бота...")
     application = Application.builder().token(BOT_TOKEN).build()
@@ -991,15 +1010,6 @@ def main() -> None:
         )
         logger.info("💾 Автосохранение кэша запланировано каждые 10 минут")
 
-        # Ежедневное обновление гороскопов в 07:00 по Москве
-        moscow_tz = pytz.timezone("Europe/Moscow")
-        job_time = datetime.strptime("07:00", "%H:%M").time().replace(tzinfo=moscow_tz)
-        application.job_queue.run_daily(
-            update_daily_data,
-            time=job_time,
-            name="daily_data_update"
-        )
-        logger.info("📅 Ежедневное обновление гороскопов запланировано на 07:00 по Москве")
 
     logger.info("🤖 Бот запущен! Ожидание сообщений...")
     
