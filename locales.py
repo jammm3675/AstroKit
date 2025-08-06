@@ -37,6 +37,10 @@ TEXTS = {
             "Choose a section you're interested in, but first, please read the [user agreement](https://example.com/tos)."
         )
     },
+    "welcome_back": {
+        "ru": "✨ *Главное меню* ✨\n\nС возвращением, {first_name}! Что вас интересует сегодня?",
+        "en": "✨ *Main Menu* ✨\n\nWelcome back, {first_name}! What are you interested in today?"
+    },
 
     # --- Main Menu ---
     "main_menu_title": {
