@@ -708,7 +708,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_premium_menu_keyboard(lang),
+            reply_markup=back_to_menu_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
