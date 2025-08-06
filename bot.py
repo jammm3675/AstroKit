@@ -456,12 +456,6 @@ def back_to_menu_keyboard(lang: str):
         [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ])
 
-def back_to_premium_menu_keyboard(lang: str):
-    """Creates a back button to the premium menu."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("back_button", lang), callback_data="premium_menu")]
-    ])
-
 def zodiac_keyboard(lang: str):
     """Creates the zodiac selection keyboard in the specified language."""
     zodiacs = ZODIAC_SIGNS[lang]
@@ -495,17 +489,6 @@ def settings_keyboard(chat_id: int, lang: str):
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ])
-
-def premium_menu_keyboard(lang: str):
-    """Creates the simplified premium menu keyboard in the specified language."""
-    buttons = [
-        [InlineKeyboardButton(
-            f"{PREMIUM_OPTIONS['permanent']['title'][lang]} ({PREMIUM_OPTIONS['permanent']['price']})",
-            callback_data="premium_permanent"
-        )],
-        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
-    ]
-    return InlineKeyboardMarkup(buttons)
 
 def language_keyboard():
     """Returns the language selection keyboard."""
@@ -691,7 +674,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         tip_text = get_text('horoscope_unavailable', lang) # Re-using a generic error message
 
-    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    text = f"💡 {get_text('tip_of_the_day_title', lang)}\n\n🌟 {tip_text}"
     
     try:
         await context.bot.edit_message_text(
@@ -855,7 +838,7 @@ def format_daily_summary(lang: str) -> str:
     # Format the horoscope section
     current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
     horoscope_lines = [f"*{sign}:* {horoscope}" for sign, horoscope in horoscopes.items()]
-    horoscope_section = "\n".join(horoscope_lines)
+    horoscope_section = "\n\n".join(horoscope_lines)
 
     # Update and format market data
     update_crypto_prices()
@@ -895,7 +878,7 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # For now, let's just show the first tip.
         tip_text = TEXTS["learning_tips"][lang][0]
 
-    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    text = f"💡 {get_text('tip_of_the_day_title', lang)}\n\n🌟 {tip_text}"
     await update.message.reply_text(text, parse_mode="Markdown")
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
@@ -995,7 +978,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         elif data == "toggle_notifications":
             await toggle_notifications(update, context)
         elif data == "premium_menu":
-            await show_premium_menu(update, context)
+            await handle_premium_choice(update, context, "permanent")
         elif data.startswith("premium_"):
             option = data.split("_")[1]
             await handle_premium_choice(update, context, option)

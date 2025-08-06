@@ -78,8 +78,8 @@ TEXTS = {
 
     # --- Tip of the day ---
     "tip_of_the_day_title": {
-        "ru": "💡 *Совет дня*",
-        "en": "💡 *Tip of the Day*"
+        "ru": "*Совет дня*",
+        "en": "*Tip of the Day*"
     },
 
     # --- Settings ---
