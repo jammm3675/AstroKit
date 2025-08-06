@@ -124,22 +124,8 @@ TEXTS = {
         "en": "💎 *Premium Access*"
     },
     "premium_menu_description": {
-        "ru": (
-            "Расширьте свои возможности с премиум подпиской:\n\n"
-            "• 🔮 Эксклюзивные астропрогнозы\n"
-            "• 📊 Расширенный рыночный анализ\n"
-            "• 💼 Персональные инвестиционные рекомендации\n"
-            "• 🚀 Приоритетная поддержка\n\n"
-            "Выберите вариант:"
-        ),
-        "en": (
-            "Expand your possibilities with a premium subscription:\n\n"
-            "• 🔮 Exclusive astro-forecasts\n"
-            "• 📊 Advanced market analysis\n"
-            "• 💼 Personal investment recommendations\n"
-            "• 🚀 Priority support\n\n"
-            "Select an option:"
-        )
+        "ru": "Расширьте свои возможности с ежемесячной подпиской на интеграцию бота в ваш чат или канал.",
+        "en": "Expand your possibilities with a monthly subscription to integrate the bot into your chat or channel."
     },
     "premium_choice_contact": {
         "ru": "Для приобретения свяжитесь с @CryptoAstroSupport",
@@ -222,5 +208,9 @@ TEXTS = {
     "poll_thank_you": {
         "ru": "Спасибо за ваш отзыв! Мы учтем его для улучшения прогнозов. ✨",
         "en": "Thank you for your feedback! We'll use it to improve our forecasts. ✨"
+    },
+    "astro_command_title": {
+        "ru": "КРИПТОГОРОСКОП",
+        "en": "CRYPTO-HOROSCOPE"
     }
 }

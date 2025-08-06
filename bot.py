@@ -184,19 +184,9 @@ def generate_bilingual_horoscopes():
 HOROSCOPES_DB = generate_bilingual_horoscopes()
 
 PREMIUM_OPTIONS = {
-    "tomorrow": {
-        "title": {"ru": "🔮 Завтрашний прогноз", "en": "🔮 Tomorrow's Forecast"},
-        "description": {"ru": "Узнайте, что ждет ваш портфель завтра", "en": "Find out what awaits your portfolio tomorrow"},
-        "price": "2$"
-    },
-    "weekly": {
-        "title": {"ru": "📅 Прогноз на неделю", "en": "📅 Weekly Forecast"},
-        "description": {"ru": "Планируйте свою стратегию на всю неделю", "en": "Plan your strategy for the whole week"},
-        "price": "5$"
-    },
     "permanent": {
         "title": {"ru": "💎 Постоянный доступ", "en": "💎 Permanent Access"},
-        "description": {"ru": "Ежедневные прогнозы и эксклюзивные аналитические материалы", "en": "Daily forecasts and exclusive analytical materials"},
+        "description": {"ru": "Расширьте свои возможности с ежемесячной подпиской на интеграцию бота в ваш чат или канал.", "en": "Expand your possibilities with a monthly subscription to integrate the bot into your chat or channel."},
         "price": "7$/мес"
     }
 }
@@ -507,14 +497,14 @@ def settings_keyboard(chat_id: int, lang: str):
     ])
 
 def premium_menu_keyboard(lang: str):
-    """Creates the premium menu keyboard in the specified language."""
+    """Creates the simplified premium menu keyboard in the specified language."""
     buttons = [
         [InlineKeyboardButton(
-            f"{opt['title'][lang]} ({opt['price']})",
-            callback_data=f"premium_{option}"
-        )] for option, opt in PREMIUM_OPTIONS.items()
+            f"{PREMIUM_OPTIONS['permanent']['title'][lang]} ({PREMIUM_OPTIONS['permanent']['price']})",
+            callback_data="premium_permanent"
+        )],
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ]
-    buttons.append([InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")])
     return InlineKeyboardMarkup(buttons)
 
 def language_keyboard():
@@ -857,35 +847,56 @@ async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_T
                 chat_ids.remove(chat_id)
                 save_broadcast_chats(chat_ids)
 
-def format_daily_summary() -> str:
-    """Formats the full daily summary message with all horoscopes and market data."""
+def format_daily_summary(lang: str) -> str:
+    """Formats the full daily summary message in the specified language."""
     # Generate a fresh set of horoscopes for the broadcast
-    horoscopes_ru = {sign: random.choice(variants) for sign, variants in HOROSCOPES_DB["ru"].items()}
+    horoscopes = {sign: random.choice(variants) for sign, variants in HOROSCOPES_DB[lang].items()}
 
     # Format the horoscope section
     current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
-    horoscope_lines = [f"*{sign}:* {horoscope}" for sign, horoscope in horoscopes_ru.items()]
+    horoscope_lines = [f"*{sign}:* {horoscope}" for sign, horoscope in horoscopes.items()]
     horoscope_section = "\n".join(horoscope_lines)
 
     # Update and format market data
     update_crypto_prices()
-    market_text = "*📊 Рынок:*\n"
+    market_text = f"*{get_text('market_rates_title', lang)}*\n"
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
             change_text, bar = format_change_bar(price_data["change"])
             market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n"
 
+    title = get_text('astro_command_title', lang)
     return (
-        f"🌌 *КРИПТОГОРОСКОП | {current_date}*\n\n"
+        f"🌌 *{title} | {current_date}*\n\n"
         f"{horoscope_section}\n\n"
         f"{market_text}"
     )
 
 async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for the /astro command."""
-    full_message = format_daily_summary()
+    lang = get_user_lang(update.message.chat_id)
+    full_message = format_daily_summary(lang)
     await update.message.reply_text(full_message, parse_mode="Markdown")
+
+async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for the /day command."""
+    chat_id = update.message.chat_id
+    lang = get_user_lang(chat_id)
+
+    # Get the tip of the day using the stored index for the user
+    user_info = get_user_data(chat_id)
+    tip_index = user_info.get("tip_index")
+
+    if tip_index is not None:
+        tip_text = TEXTS["learning_tips"][lang][tip_index]
+    else:
+        # If no tip is set (e.g., a user from before the update), show an error or a default.
+        # For now, let's just show the first tip.
+        tip_text = TEXTS["learning_tips"][lang][0]
+
+    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     """Job to broadcast the daily summary to all subscribed channels."""
@@ -895,7 +906,7 @@ async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
         logger.info("No broadcast chats to send to.")
         return
 
-    full_message = format_daily_summary()
+    full_message = format_daily_summary(lang="ru") # Broadcasts are in Russian by default
     for chat_id in chat_ids:
         try:
             await context.bot.send_message(chat_id=chat_id, text=full_message, parse_mode="Markdown")
@@ -949,11 +960,15 @@ async def handle_premium_choice(update: Update, context: ContextTypes.DEFAULT_TY
     )
     
     try:
+        keyboard = back_to_premium_menu_keyboard(lang)
+        if option == "permanent":
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(get_text('main_menu_button', lang), callback_data='main_menu')]])
+
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=keyboard,
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -1076,6 +1091,7 @@ def main() -> None:
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("astro", astro_command))
+    application.add_handler(CommandHandler("day", day_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(PollHandler(handle_poll_answer))
     application.add_handler(ChatMemberHandler(handle_new_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
