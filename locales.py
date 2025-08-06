@@ -196,5 +196,27 @@ TEXTS = {
             "💫 *ASTRO-FORECAST!*\n\nVenus approaches Saturn → The perfect time to rebalance your portfolio!",
             "🌕 *SPECIAL PERIOD!*\n\nFull Moon in Aquarius → Expect unexpected market movements! Prepare for possible corrections."
         ]
+    },
+
+    # --- Poll Notification ---
+    "poll_question": {
+        "ru": "Как вам сегодняшний прогноз?",
+        "en": "How was today's forecast?"
+    },
+    "poll_option_accurate": {
+        "ru": "👍 Точный",
+        "en": "👍 Accurate"
+    },
+    "poll_option_inaccurate": {
+        "ru": "👎 Не совпал",
+        "en": "👎 Inaccurate"
+    },
+    "poll_option_profit": {
+        "ru": "💰 Принес прибыль",
+        "en": "💰 It was profitable"
+    },
+    "poll_thank_you": {
+        "ru": "Спасибо за ваш отзыв! Мы учтем его для улучшения прогнозов. ✨",
+        "en": "Thank you for your feedback! We'll use it to improve our forecasts. ✨"
     }
 }
