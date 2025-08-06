@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 import pytz
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, PollHandler
 from telegram.error import TelegramError, BadRequest, Conflict
 from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP
 
@@ -553,10 +553,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         disable_web_page_preview=True
     )
     
-    # Schedule notifications if enabled
-    if user_info["notifications"] and context.job_queue:
-        schedule_user_notifications(context.job_queue, chat_id)
-        logger.info(f"Notifications activated for user {chat_id}")
 
 async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Callback handler for language selection."""
@@ -571,29 +567,13 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Show the main menu in the selected language
     await show_main_menu(update, context)
 
-def schedule_user_notifications(job_queue, chat_id):
-    """Планирование ежечасных уведомлений для пользователя"""
-    try:
-        # Удаляем существующие задачи для этого пользователя, чтобы избежать дублирования
-        current_jobs = job_queue.get_jobs_by_name(f"notification_{chat_id}")
-        for job in current_jobs:
-            job.schedule_removal()
-        
-        # Создаем новую задачу, которая повторяется каждый час
-        job_queue.run_repeating(
-            send_notification,
-            interval=3600,  # 3600 секунд = 1 час
-            first=1,  # Запустить через 1 секунду после вызова
-            chat_id=chat_id,
-            name=f"notification_{chat_id}"
-        )
-        logger.info(f"Ежечасные уведомления запланированы для {chat_id}")
-    except Exception as e:
-        logger.error(f"Ошибка планирования уведомлений для {chat_id}: {e}")
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows the main menu."""
     query = update.callback_query
+    if query:
+        await query.answer() # Acknowledge the button press
+
     chat_id = query.message.chat_id if query else update.effective_chat.id
     lang = get_user_lang(chat_id)
 
@@ -768,58 +748,66 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     )
 
 async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Переключение уведомлений"""
+    """Toggles user notifications on or off."""
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat_id
-    
-    # Получаем данные пользователя
-    user_info = get_user_data(chat_id)
-    new_status = not user_info.get("notifications", True)
-    
-    # Обновляем настройки
-    user_info["notifications"] = new_status
-    
-    # Обновляем или удаляем задачу
-    if new_status and context.job_queue:
-        # Создаем новую задачу
-        schedule_user_notifications(context.job_queue, chat_id)
-        logger.info(f"Уведомления включены для {chat_id}")
-    elif not new_status and context.job_queue:
-        # Удаляем существующую задачу
-        current_jobs = context.job_queue.get_jobs_by_name(f"notification_{chat_id}")
-        for job in current_jobs:
-            job.schedule_removal()
-        logger.info(f"Уведомления отключены для {chat_id}")
-    
-    # Показываем обновленные настройки
-    await show_settings_menu(update, context)
-
-async def send_notification(context: ContextTypes.DEFAULT_TYPE):
-    """Sends a notification to a user in their selected language and deletes it after 10 minutes."""
-    job = context.job
-    chat_id = job.chat_id
     lang = get_user_lang(chat_id)
     
-    # Choose a random alert in the user's language
-    alert = random.choice(TEXTS["notification_alerts"][lang])
+    user_info = get_user_data(chat_id)
+    new_status = not user_info.get("notifications", True)
+    user_info["notifications"] = new_status
+    
+    status_text = "enabled" if new_status else "disabled"
+    logger.info(f"Notifications for user {chat_id} are now {status_text}")
+    
+    # Show updated settings menu
+    await show_settings_menu(update, context)
+
+async def send_daily_poll_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to send a poll to all users with notifications enabled."""
+    logger.info("Starting daily poll job...")
+    for chat_id, data in user_data.items():
+        if data.get("notifications"):
+            lang = data.get("language", "ru")
+            question = get_text("poll_question", lang)
+            options = [
+                get_text("poll_option_accurate", lang),
+                get_text("poll_option_inaccurate", lang),
+                get_text("poll_option_profit", lang),
+            ]
+            try:
+                await context.bot.send_poll(
+                    chat_id=chat_id,
+                    question=question,
+                    options=options,
+                    is_anonymous=True, # The poll is anonymous as requested
+                    allows_multiple_answers=False,
+                )
+                logger.info(f"Sent daily poll to {chat_id}")
+            except Exception as e:
+                logger.error(f"Failed to send poll to {chat_id}: {e}")
+    logger.info("Daily poll job finished.")
+
+async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles a user's response to the daily poll."""
+    poll_answer = update.poll_answer
+    user = poll_answer.user
+    chat_id = user.id
+    lang = get_user_lang(chat_id)
+
+    # The poll is anonymous, so we don't know the answer. We just thank the user.
+    thank_you_text = get_text("poll_thank_you", lang)
     
     try:
-        message = await context.bot.send_message(
-            chat_id=chat_id,
-            text=alert,
-            parse_mode="Markdown"
-        )
-        
-        # Schedule deletion after 10 minutes
-        await asyncio.sleep(600)
-        await context.bot.delete_message(
-            chat_id=chat_id,
-            message_id=message.message_id
-        )
-        logger.info(f"Notification sent and deleted for {chat_id}")
+        message = await context.bot.send_message(chat_id=chat_id, text=thank_you_text)
+        # Schedule the thank you message to be deleted after 10 seconds
+        await asyncio.sleep(10)
+        await context.bot.delete_message(chat_id=chat_id, message_id=message.message_id)
+        logger.info(f"Sent and deleted thank you message for poll answer to {chat_id}")
     except Exception as e:
-        logger.error(f"Error sending notification: {e}")
+        logger.error(f"Failed to send/delete thank you message for poll to {chat_id}: {e}")
+
 
 async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows the premium menu."""
@@ -992,9 +980,20 @@ def main() -> None:
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
+    application.add_handler(PollHandler(handle_poll_answer))
     logger.info("✅ Обработчики зарегистрированы")
 
     # Задачи JobQueue
+    if application.job_queue:
+        # Schedule daily poll job
+        moscow_tz = pytz.timezone("Europe/Moscow")
+        poll_time = datetime.strptime("21:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        application.job_queue.run_daily(
+            send_daily_poll_job,
+            time=poll_time,
+            name="daily_poll_job"
+        )
+        logger.info("📅 Daily poll job scheduled for 21:00 Moscow time.")
     if application.job_queue:
         # Обновление курсов криптовалют каждые 5 минут
         application.job_queue.run_repeating(
