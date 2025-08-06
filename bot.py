@@ -162,13 +162,13 @@ def generate_bilingual_horoscopes():
             emoji = random.choice(["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡"])
 
             text_ru = (
-                f"{emoji} *{sign_ru}:*\n"
+                f"{emoji} *{sign_ru}:*\n\n"
                 f"Сегодня *{mood['ru']}* для крипто-активов! Звезды советуют: "
                 f"*{action['ru']} {asset}.*\n"
                 f"Особое внимание уделите *{theme['ru']}*. {ending['ru'].capitalize()}!"
             )
             text_en = (
-                f"{emoji} *{sign_en}:*\n"
+                f"{emoji} *{sign_en}:*\n\n"
                 f"Today is *{mood['en']}* for crypto assets! The stars advise: "
                 f"*{action['en']} {asset}.*\n"
                 f"Pay special attention to *{theme['en']}*. {ending['en'].capitalize()}!"
@@ -668,7 +668,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(get_text('main_menu_button', lang), callback_data='main_menu')]]),
+            reply_markup=back_to_menu_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -849,13 +849,24 @@ async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_T
 
 def format_daily_summary(lang: str) -> str:
     """Formats the full daily summary message in the specified language."""
-    # Generate a fresh set of horoscopes for the broadcast
-    horoscopes = {sign: random.choice(variants) for sign, variants in HOROSCOPES_DB[lang].items()}
+    # Generate a fresh set of unique horoscopes for the broadcast
+    horoscopes = {}
+    used_horoscopes = set()
+    for sign, variants in HOROSCOPES_DB[lang].items():
+        available_variants = [h for h in variants if h not in used_horoscopes]
+        if not available_variants:
+            # Fallback if all unique horoscopes for a sign are used (unlikely)
+            chosen_horoscope = random.choice(variants)
+        else:
+            chosen_horoscope = random.choice(available_variants)
+
+        horoscopes[sign] = chosen_horoscope
+        used_horoscopes.add(chosen_horoscope)
 
     # Format the horoscope section
     current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
-    horoscope_lines = [f"*{sign}:* {horoscope}" for sign, horoscope in horoscopes.items()]
-    horoscope_section = "\n".join(horoscope_lines)
+    horoscope_lines = [f"*{sign}:* {horoscope.split(':', 1)[1].strip()}" for sign, horoscope in horoscopes.items()]
+    horoscope_section = "\n\n".join(horoscope_lines)
 
     # Update and format market data
     update_crypto_prices()
@@ -895,7 +906,7 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # For now, let's just show the first tip.
         tip_text = TEXTS["learning_tips"][lang][0]
 
-    text = f"💡 *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{tip_text}"
     await update.message.reply_text(text, parse_mode="Markdown")
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
@@ -962,7 +973,7 @@ async def handle_premium_choice(update: Update, context: ContextTypes.DEFAULT_TY
     try:
         keyboard = back_to_premium_menu_keyboard(lang)
         if option == "permanent":
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(get_text('main_menu_button', lang), callback_data='main_menu')]])
+            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(get_text('back_button', lang), callback_data='main_menu')]])
 
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -995,7 +1006,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         elif data == "toggle_notifications":
             await toggle_notifications(update, context)
         elif data == "premium_menu":
-            await show_premium_menu(update, context)
+            await handle_premium_choice(update, context, "permanent")
         elif data.startswith("premium_"):
             option = data.split("_")[1]
             await handle_premium_choice(update, context, option)

@@ -52,7 +52,7 @@ TEXTS = {
     "settings_button": {"ru": "⚙️ Настройки", "en": "⚙️ Settings"},
     "premium_button": {"ru": "💎 Премиум", "en": "💎 Premium"},
     "back_button": {"ru": "⬅️ Назад", "en": "⬅️ Back"},
-    "main_menu_button": {"ru": "🏠 Главное меню", "en": "🏠 Main Menu"},
+    "main_menu_button": {"ru": "⬅️ Назад", "en": "⬅️ Back"},
 
     # --- Horoscope ---
     "zodiac_select_title": {
