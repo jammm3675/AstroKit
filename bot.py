@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 import pytz
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, PollHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, PollHandler, ChatMemberHandler
 from telegram.error import TelegramError, BadRequest, Conflict
 from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP
 
@@ -210,7 +210,8 @@ def get_user_data(chat_id: int) -> dict:
             "notifications": True,
             "last_update": None,
             "tip_index": None,
-            "horoscope_indices": {}
+            "horoscope_indices": {},
+            "is_new_user": True
         }
     return user_data[chat_id]
 
@@ -465,6 +466,12 @@ def back_to_menu_keyboard(lang: str):
         [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ])
 
+def back_to_premium_menu_keyboard(lang: str):
+    """Creates a back button to the premium menu."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="premium_menu")]
+    ])
+
 def zodiac_keyboard(lang: str):
     """Creates the zodiac selection keyboard in the specified language."""
     zodiacs = ZODIAC_SIGNS[lang]
@@ -525,7 +532,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     user_info = get_user_data(chat_id)
 
-    if user_info.get("language") is None:
+    if user_info.get("language") is None or user_info.get("is_new_user"):
         lang_prompt = f"🇷🇺 {get_text('language_select', 'ru')} / 🇬🇧 {get_text('language_select', 'en')}"
         await context.bot.send_message(
             chat_id=chat_id,
@@ -534,24 +541,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    lang = user_info["language"]
-    
-    # Update user's daily content if needed
-    update_user_horoscope(chat_id)
-
-    # Update crypto prices
-    update_crypto_prices()
-    
-    # Welcome message
-    welcome_text = get_text("welcome", lang).format(first_name=user.first_name)
-    
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=welcome_text,
-        reply_markup=main_menu_keyboard(lang),
-        parse_mode="Markdown",
-        disable_web_page_preview=True
-    )
+    # For returning users, show the main menu directly
+    await show_main_menu(update, context)
     
 
 async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -559,13 +550,27 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     query = update.callback_query
     await query.answer()
 
+    user = query.from_user
     chat_id = query.message.chat_id
     user_info = get_user_data(chat_id)
     lang = query.data.split("_")[-1]  # 'ru' or 'en'
     user_info["language"] = lang
 
-    # Show the main menu in the selected language
-    await show_main_menu(update, context)
+    # If user is new, show full welcome message and set flag to false
+    if user_info.get("is_new_user"):
+        user_info["is_new_user"] = False
+        welcome_text = get_text("welcome", lang).format(first_name=user.first_name)
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=welcome_text,
+            reply_markup=main_menu_keyboard(lang),
+            parse_mode="Markdown",
+            disable_web_page_preview=True
+        )
+    else:
+        # If user is just changing language, show the main menu
+        await show_main_menu(update, context)
 
 
 async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -580,6 +585,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     update_user_horoscope(chat_id)
     update_crypto_prices()
     
+    # Use a generic title for the main menu
     text = get_text("main_menu_title", lang)
     
     try:
@@ -593,10 +599,11 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 parse_mode="Markdown"
             )
         else:
-            # Send a new message if it's a command
+            # Send a new message if it's a command (e.g., from /start for a returning user)
+            welcome_text = get_text("welcome_back", lang).format(first_name=update.effective_user.first_name)
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=text,
+                text=welcome_text,
                 reply_markup=main_menu_keyboard(lang),
                 parse_mode="Markdown"
             )
@@ -701,7 +708,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=back_to_premium_menu_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -808,6 +815,95 @@ async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error(f"Failed to send/delete thank you message for poll to {chat_id}: {e}")
 
+# --- Channel Broadcast Feature ---
+
+def load_broadcast_chats():
+    """Loads the list of broadcast chat IDs from a JSON file."""
+    try:
+        with open("broadcast_chats.json", "r") as f:
+            data = json.load(f)
+            return data.get("broadcast_chat_ids", [])
+    except FileNotFoundError:
+        logger.warning("broadcast_chats.json not found. Creating a new one.")
+        with open("broadcast_chats.json", "w") as f:
+            json.dump({"broadcast_chat_ids": []}, f)
+        return []
+    except Exception as e:
+        logger.error(f"Error loading broadcast_chats.json: {e}")
+        return []
+
+def save_broadcast_chats(chat_ids):
+    """Saves the list of broadcast chat IDs to a JSON file."""
+    try:
+        with open("broadcast_chats.json", "w") as f:
+            json.dump({"broadcast_chat_ids": chat_ids}, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving broadcast_chats.json: {e}")
+
+async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the bot being added to a new chat."""
+    if update.my_chat_member.new_chat_member.user.id == context.bot.id:
+        chat_id = update.my_chat_member.chat.id
+        if update.my_chat_member.new_chat_member.status in ["member", "administrator"]:
+            logger.info(f"Bot was added to chat {chat_id}. Adding to broadcast list.")
+            chat_ids = load_broadcast_chats()
+            if chat_id not in chat_ids:
+                chat_ids.append(chat_id)
+                save_broadcast_chats(chat_ids)
+        elif update.my_chat_member.new_chat_member.status in ["left", "kicked"]:
+            logger.info(f"Bot was removed from chat {chat_id}. Removing from broadcast list.")
+            chat_ids = load_broadcast_chats()
+            if chat_id in chat_ids:
+                chat_ids.remove(chat_id)
+                save_broadcast_chats(chat_ids)
+
+def format_daily_summary() -> str:
+    """Formats the full daily summary message with all horoscopes and market data."""
+    # Generate a fresh set of horoscopes for the broadcast
+    horoscopes_ru = {sign: random.choice(variants) for sign, variants in HOROSCOPES_DB["ru"].items()}
+
+    # Format the horoscope section
+    current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
+    horoscope_lines = [f"*{sign}:* {horoscope}" for sign, horoscope in horoscopes_ru.items()]
+    horoscope_section = "\n".join(horoscope_lines)
+
+    # Update and format market data
+    update_crypto_prices()
+    market_text = "*📊 Рынок:*\n"
+    for symbol in CRYPTO_IDS:
+        price_data = crypto_prices[symbol]
+        if price_data["price"] is not None and price_data["change"] is not None:
+            change_text, bar = format_change_bar(price_data["change"])
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n"
+
+    return (
+        f"🌌 *КРИПТОГОРОСКОП | {current_date}*\n\n"
+        f"{horoscope_section}\n\n"
+        f"{market_text}"
+    )
+
+async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for the /astro command."""
+    full_message = format_daily_summary()
+    await update.message.reply_text(full_message, parse_mode="Markdown")
+
+async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to broadcast the daily summary to all subscribed channels."""
+    logger.info("Starting daily broadcast job...")
+    chat_ids = load_broadcast_chats()
+    if not chat_ids:
+        logger.info("No broadcast chats to send to.")
+        return
+
+    full_message = format_daily_summary()
+    for chat_id in chat_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=full_message, parse_mode="Markdown")
+            logger.info(f"Successfully broadcasted to chat {chat_id}")
+        except Exception as e:
+            logger.error(f"Failed to broadcast to chat {chat_id}: {e}")
+    logger.info("Daily broadcast job finished.")
+
 
 async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows the premium menu."""
@@ -818,7 +914,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     lang = get_user_lang(chat_id)
 
     text = (
-        f"💎 *{get_text('premium_menu_title', lang)}*\n\n"
+        f"*{get_text('premium_menu_title', lang)}*\n\n"
         f"{get_text('premium_menu_description', lang)}"
     )
     
@@ -979,22 +1075,26 @@ def main() -> None:
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("astro", astro_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(PollHandler(handle_poll_answer))
+    application.add_handler(ChatMemberHandler(handle_new_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
     logger.info("✅ Обработчики зарегистрированы")
 
     # Задачи JobQueue
     if application.job_queue:
-        # Schedule daily poll job
         moscow_tz = pytz.timezone("Europe/Moscow")
+
+        # Schedule daily poll job
         poll_time = datetime.strptime("21:00", "%H:%M").time().replace(tzinfo=moscow_tz)
-        application.job_queue.run_daily(
-            send_daily_poll_job,
-            time=poll_time,
-            name="daily_poll_job"
-        )
+        application.job_queue.run_daily(send_daily_poll_job, time=poll_time, name="daily_poll_job")
         logger.info("📅 Daily poll job scheduled for 21:00 Moscow time.")
-    if application.job_queue:
+
+        # Schedule daily broadcast job
+        broadcast_time = datetime.strptime("07:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        application.job_queue.run_daily(broadcast_job, time=broadcast_time, name="daily_broadcast_job")
+        logger.info("📅 Daily broadcast job scheduled for 07:00 Moscow time.")
+
         # Обновление курсов криптовалют каждые 5 минут
         application.job_queue.run_repeating(
             lambda context: update_crypto_prices(),
