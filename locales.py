@@ -130,13 +130,13 @@ TEXTS = {
         "ru": (
             "Если вам нравится AstroKit и вы хотите поддержать автора, вы можете:\n\n"
             "🎁 Отправить подарок в Telegram на @CryptoAstroSupport\n"
-            "💎 Отправить TON на адрес:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
+            "💎 Отправить TON/USDT на адрес:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
             "Ваша поддержка помогает развивать проект! Спасибо! 🙏"
         ),
         "en": (
             "If you enjoy AstroKit and would like to support the author, you can:\n\n"
             "🎁 Send a gift on Telegram to @CryptoAstroSupport\n"
-            "💎 Send TON to this address:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
+            "💎 Send TON/USDT to this address:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
             "Your support helps the project grow! Thank you! 🙏"
         )
     },
