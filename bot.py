@@ -882,13 +882,16 @@ def format_daily_summary(lang: str) -> str:
 
 async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for the /astro command."""
+    update_user_horoscope(update.message.chat_id)
     lang = get_user_lang(update.message.chat_id)
     full_message = format_daily_summary(lang)
     await update.message.reply_text(full_message, parse_mode="Markdown")
 
+
 async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handler for the /day command."""
     chat_id = update.message.chat_id
+    update_user_horoscope(chat_id)
     lang = get_user_lang(chat_id)
 
     # Get the tip of the day using the stored index for the user
