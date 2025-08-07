@@ -10,7 +10,7 @@ from datetime import datetime, date, timedelta
 import pytz
 from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, PollHandler, ChatMemberHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, PollHandler, ChatMemberHandler, filters
 from telegram.error import TelegramError, BadRequest, Conflict
 from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP
 
@@ -153,13 +153,15 @@ def generate_bilingual_horoscopes():
 
     horoscopes = {"ru": {}, "en": {}}
     zodiac_pairs = zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"])
+    emojis = ["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡️", "🎯", "🤖", "🌔"]
+    random.shuffle(emojis)
 
-    for sign_ru, sign_en in zodiac_pairs:
+    for i, (sign_ru, sign_en) in enumerate(zodiac_pairs):
         variants_ru, variants_en = [], []
         for _ in range(30):  # 30 variants for each sign
             theme, action, mood, ending = random.choice(themes), random.choice(actions), random.choice(moods), random.choice(endings)
             asset = random.choice(assets)
-            emoji = random.choice(["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡"])
+            emoji = emojis[i % len(emojis)]
 
             text_ru = (
                 f"{emoji} *{sign_ru}:*\n\n"
@@ -182,15 +184,6 @@ def generate_bilingual_horoscopes():
     return horoscopes
 
 HOROSCOPES_DB = generate_bilingual_horoscopes()
-
-PREMIUM_OPTIONS = {
-    "permanent": {
-        "title": {"ru": "💎 Постоянный доступ", "en": "💎 Permanent Access"},
-        "description": {"ru": "Расширьте свои возможности с ежемесячной подпиской на интеграцию бота в ваш чат или канал.", "en": "Expand your possibilities with a monthly subscription to integrate the bot into your chat or channel."},
-        "price": "7$/мес"
-    }
-}
-
 
 def get_user_data(chat_id: int) -> dict:
     """Gets or creates a user's data entry."""
@@ -453,7 +446,7 @@ def main_menu_keyboard(lang: str):
 def back_to_menu_keyboard(lang: str):
     """Creates a back button in the specified language."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
+        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
 
 def back_to_premium_menu_keyboard(lang: str):
@@ -478,7 +471,7 @@ def zodiac_keyboard(lang: str):
         ])
     
     # Add back button
-    buttons.append([InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")])
+    buttons.append([InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")])
     
     return InlineKeyboardMarkup(buttons)
 
@@ -493,19 +486,9 @@ def settings_keyboard(chat_id: int, lang: str):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
-        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
+        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
 
-def premium_menu_keyboard(lang: str):
-    """Creates the simplified premium menu keyboard in the specified language."""
-    buttons = [
-        [InlineKeyboardButton(
-            f"{PREMIUM_OPTIONS['permanent']['title'][lang]} ({PREMIUM_OPTIONS['permanent']['price']})",
-            callback_data="premium_permanent"
-        )],
-        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
-    ]
-    return InlineKeyboardMarkup(buttons)
 
 def language_keyboard():
     """Returns the language selection keyboard."""
@@ -656,11 +639,13 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         horoscope_text = get_text('horoscope_unavailable', lang)
 
+    disclaimer_text = get_text("horoscope_disclaimer", lang)
     text = (
         f"*{display_zodiac} | {current_date}*\n\n"
         f"{horoscope_text}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{market_text}"
+        f"{disclaimer_text}"
     )
     
     try:
@@ -851,22 +836,33 @@ def format_daily_summary(lang: str) -> str:
     """Formats the full daily summary message in the specified language."""
     # Generate a fresh set of unique horoscopes for the broadcast
     horoscopes = {}
-    used_horoscopes = set()
-    for sign, variants in HOROSCOPES_DB[lang].items():
-        available_variants = [h for h in variants if h not in used_horoscopes]
-        if not available_variants:
-            # Fallback if all unique horoscopes for a sign are used (unlikely)
-            chosen_horoscope = random.choice(variants)
-        else:
-            chosen_horoscope = random.choice(available_variants)
+    emojis = ["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡️", "🎯", "🤖", "🌔"]
+    random.shuffle(emojis)
 
-        horoscopes[sign] = chosen_horoscope
-        used_horoscopes.add(chosen_horoscope)
+    # Get all zodiac signs for the specified language
+    zodiac_signs = ZODIAC_SIGNS[lang]
+
+    # Ensure each sign gets a unique horoscope for the day
+    horoscope_indices = {sign: random.randint(0, 29) for sign in ZODIAC_SIGNS["ru"]}
+
+    for i, sign_name in enumerate(zodiac_signs):
+        # Find the original Russian sign name to access the database
+        original_sign = list(ZODIAC_CALLBACK_MAP.keys())[list(ZODIAC_CALLBACK_MAP.values()).index(sign_name)] if lang == "en" else sign_name
+
+        # Get the horoscope text
+        horoscope_index = horoscope_indices[original_sign]
+        full_horoscope_text = HOROSCOPES_DB[lang][sign_name][horoscope_index]
+
+        # Extract the main text part, removing the default emoji and sign name
+        horoscope_main_text = full_horoscope_text.split("\n\n", 1)[1]
+
+        # Assign a new unique emoji
+        emoji = emojis[i % len(emojis)]
+        horoscopes[sign_name] = f"{emoji} *{sign_name}:*\n\n{horoscope_main_text}"
 
     # Format the horoscope section
     current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
-    horoscope_lines = [f"*{sign}:* {horoscope.split(':', 1)[1].strip()}" for sign, horoscope in horoscopes.items()]
-    horoscope_section = "\n\n".join(horoscope_lines)
+    horoscope_section = "\n\n".join(horoscopes.values())
 
     # Update and format market data
     update_crypto_prices()
@@ -936,7 +932,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     lang = get_user_lang(chat_id)
 
     text = (
-        f"*{get_text('premium_menu_title', lang)}*\n\n"
+        f"{get_text('premium_menu_title', lang)}\n\n"
         f"{get_text('premium_menu_description', lang)}"
     )
     
@@ -945,45 +941,12 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=premium_menu_keyboard(lang),
-            parse_mode="Markdown"
+            reply_markup=back_to_menu_keyboard(lang),
+            parse_mode="Markdown",
+            disable_web_page_preview=True
         )
     except BadRequest as e:
         logger.error(f"Error showing premium menu: {e}")
-
-async def handle_premium_choice(update: Update, context: ContextTypes.DEFAULT_TYPE, option: str) -> None:
-    """Handles a premium option selection."""
-    query = update.callback_query
-    await query.answer()
-    
-    chat_id = query.message.chat_id
-    lang = get_user_lang(chat_id)
-
-    if option not in PREMIUM_OPTIONS:
-        return
-    
-    selected = PREMIUM_OPTIONS[option]
-    text = (
-        f"✨ *{selected['title'][lang]}*\n\n"
-        f"📝 {selected['description'][lang]}\n\n"
-        f"💎 *{get_text('premium_price', lang)}:* {selected['price']}\n\n"
-        f"{get_text('premium_choice_contact', lang)}"
-    )
-    
-    try:
-        keyboard = back_to_premium_menu_keyboard(lang)
-        if option == "permanent":
-            keyboard = InlineKeyboardMarkup([[InlineKeyboardButton(get_text('back_button', lang), callback_data='main_menu')]])
-
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=query.message.message_id,
-            text=text,
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
-    except BadRequest as e:
-        logger.error(f"Error handling premium choice: {e}")
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Main callback query handler."""
@@ -1006,10 +969,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         elif data == "toggle_notifications":
             await toggle_notifications(update, context)
         elif data == "premium_menu":
-            await handle_premium_choice(update, context, "permanent")
-        elif data.startswith("premium_"):
-            option = data.split("_")[1]
-            await handle_premium_choice(update, context, option)
+            await show_premium_menu(update, context)
         elif data.startswith("set_lang_"):
             await set_language(update, context)
         elif data == "change_language":
@@ -1101,8 +1061,8 @@ def main() -> None:
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("astro", astro_command))
-    application.add_handler(CommandHandler("day", day_command))
+    application.add_handler(CommandHandler("astro", astro_command, filters=filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP))
+    application.add_handler(CommandHandler("day", day_command, filters=filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(PollHandler(handle_poll_answer))
     application.add_handler(ChatMemberHandler(handle_new_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
