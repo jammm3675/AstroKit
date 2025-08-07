@@ -127,9 +127,9 @@ FALLBACK_DATA = {
 def generate_bilingual_horoscopes():
     """Generates a database of horoscopes in both Russian and English."""
     themes = [
-        {"ru": "инвестиции", "en": "investments"}, {"ru": "трейдинг", "en": "trading"},
-        {"ru": "стейкинг", "en": "staking"}, {"ru": "NFT", "en": "NFTs"},
-        {"ru": "DeFi", "en": "DeFi"}, {"ru": "майнинг", "en": "mining"}
+        {"ru": "инвестициям", "en": "investments"}, {"ru": "трейдингу", "en": "trading"},
+        {"ru": "стейкингу", "en": "staking"}, {"ru": "NFT", "en": "NFTs"},
+        {"ru": "DeFi", "en": "DeFi"}, {"ru": "майнингу", "en": "mining"}
     ]
     actions = [
         {"ru": "инвестируйте в", "en": "invest in"}, {"ru": "избегайте", "en": "avoid"},
@@ -1061,8 +1061,8 @@ def main() -> None:
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("astro", astro_command, filters=filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP))
-    application.add_handler(CommandHandler("day", day_command, filters=filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP))
+    application.add_handler(CommandHandler("astro", astro_command, filters=filters.ALL))
+    application.add_handler(CommandHandler("day", day_command, filters=filters.ALL))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(PollHandler(handle_poll_answer))
     application.add_handler(ChatMemberHandler(handle_new_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
