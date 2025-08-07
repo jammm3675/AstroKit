@@ -50,9 +50,8 @@ TEXTS = {
     "horoscope_button": {"ru": "🔮 Гороскоп", "en": "🔮 Horoscope"},
     "tip_button": {"ru": "💡 Совет дня", "en": "💡 Tip of the day"},
     "settings_button": {"ru": "⚙️ Настройки", "en": "⚙️ Settings"},
-    "premium_button": {"ru": "💎 Премиум", "en": "💎 Premium"},
-    "back_button": {"ru": "⬅️ Назад", "en": "⬅️ Back"},
-    "main_menu_button": {"ru": "⬅️ Назад", "en": "⬅️ Back"},
+    "premium_button": {"ru": "✨ Поддержать", "en": "✨ Support"},
+    "main_menu_button": {"ru": "⬅️ Главное меню", "en": "⬅️ Main Menu"},
 
     # --- Horoscope ---
     "zodiac_select_title": {
@@ -66,6 +65,10 @@ TEXTS = {
     "horoscope_unavailable": {
         "ru": "Гороскоп временно недоступен",
         "en": "Horoscope temporarily unavailable"
+    },
+    "horoscope_disclaimer": {
+        "ru": "\n\n_Помните, что гороскоп носит развлекательный характер. Всегда проводите собственное исследование перед принятием финансовых решений._",
+        "en": "\n\n_Remember that the horoscope is for entertainment purposes. Always do your own research before making financial decisions._"
     },
     "market_rates_title": {
         "ru": "\n\n📊 *Курс криптовалют:*\n",
@@ -120,20 +123,22 @@ TEXTS = {
 
     # --- Premium ---
     "premium_menu_title": {
-        "ru": "💎 *Премиум доступ*",
-        "en": "💎 *Premium Access*"
+        "ru": "✨ *Поддержать автора*",
+        "en": "✨ *Support the author*"
     },
     "premium_menu_description": {
-        "ru": "Расширьте свои возможности с ежемесячной подпиской на интеграцию бота в ваш чат или канал.",
-        "en": "Expand your possibilities with a monthly subscription to integrate the bot into your chat or channel."
-    },
-    "premium_choice_contact": {
-        "ru": "Для приобретения свяжитесь с @CryptoAstroSupport",
-        "en": "To purchase, contact @CryptoAstroSupport"
-    },
-    "premium_price": {
-        "ru": "Стоимость",
-        "en": "Price"
+        "ru": (
+            "Если вам нравится AstroKit и вы хотите поддержать автора, вы можете:\n\n"
+            "🎁 Отправить подарок в Telegram на @CryptoAstroSupport\n"
+            "💎 Отправить TON на адрес:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
+            "Ваша поддержка помогает развивать проект! Спасибо! 🙏"
+        ),
+        "en": (
+            "If you enjoy AstroKit and would like to support the author, you can:\n\n"
+            "🎁 Send a gift on Telegram to @CryptoAstroSupport\n"
+            "💎 Send TON to this address:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
+            "Your support helps the project grow! Thank you! 🙏"
+        )
     },
 
     # --- Generic Error ---
