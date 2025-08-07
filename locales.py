@@ -52,6 +52,7 @@ TEXTS = {
     "settings_button": {"ru": "⚙️ Настройки", "en": "⚙️ Settings"},
     "premium_button": {"ru": "✨ Поддержать", "en": "✨ Support"},
     "main_menu_button": {"ru": "⬅️ Главное меню", "en": "⬅️ Main Menu"},
+    "back_button": {"ru": "⬅️ Назад", "en": "⬅️ Back"},
 
     # --- Horoscope ---
     "zodiac_select_title": {
@@ -129,13 +130,13 @@ TEXTS = {
     "premium_menu_description": {
         "ru": (
             "Если вам нравится AstroKit и вы хотите поддержать автора, вы можете:\n\n"
-            "🎁 Отправить подарок в Telegram на @CryptoAstroSupport\n"
+            "🎁 Отправить подарок в Telegram на @CryptoAstroSupport\n\n"
             "💎 Отправить TON на адрес:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
             "Ваша поддержка помогает развивать проект! Спасибо! 🙏"
         ),
         "en": (
             "If you enjoy AstroKit and would like to support the author, you can:\n\n"
-            "🎁 Send a gift on Telegram to @CryptoAstroSupport\n"
+            "🎁 Send a gift on Telegram to @CryptoAstroSupport\n\n"
             "💎 Send TON to this address:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
             "Your support helps the project grow! Thank you! 🙏"
         )

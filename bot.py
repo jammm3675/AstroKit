@@ -449,6 +449,12 @@ def back_to_menu_keyboard(lang: str):
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
 
+def back_keyboard(lang: str):
+    """Creates a back button in the specified language."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
+    ])
+
 def back_to_premium_menu_keyboard(lang: str):
     """Creates a back button to the premium menu."""
     return InlineKeyboardMarkup([
@@ -471,7 +477,7 @@ def zodiac_keyboard(lang: str):
         ])
     
     # Add back button
-    buttons.append([InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")])
+    buttons.append([InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")])
     
     return InlineKeyboardMarkup(buttons)
 
@@ -486,7 +492,7 @@ def settings_keyboard(chat_id: int, lang: str):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
-        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="main_menu")]
     ])
 
 
@@ -653,7 +659,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=back_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -941,7 +947,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=back_keyboard(lang),
             parse_mode="Markdown",
             disable_web_page_preview=True
         )
@@ -1061,8 +1067,8 @@ def main() -> None:
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("astro", astro_command, filters=filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP))
-    application.add_handler(CommandHandler("day", day_command, filters=filters.ChatType.GROUPS | filters.ChatType.SUPERGROUP))
+    application.add_handler(CommandHandler("astro", astro_command))
+    application.add_handler(CommandHandler("day", day_command))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(PollHandler(handle_poll_answer))
     application.add_handler(ChatMemberHandler(handle_new_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
