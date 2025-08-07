@@ -28,13 +28,13 @@ TEXTS = {
             "✨ *Добро пожаловать в AstroKit, {first_name}!* ✨\n\n"
             "🌟 Ваш персональный крипто-астролог!\n"
             "📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\n\n"
-            "Выбери интересующий раздел, но перед этим ознакомься с [пользовательским соглашением](https://example.com/tos)."
+            "Выбери интересующий раздел, но перед этим ознакомься с [пользовательским соглашением](https://telegra.ph/Polzovatelskoe-soglashenie--Terms-of-Service-08-07)."
         ),
         "en": (
             "✨ *Welcome to AstroKit, {first_name}!* ✨\n\n"
             "🌟 Your personal crypto astrologer!\n"
             "📅 Based on star charts and market trends, I can give you advice for today!\n\n"
-            "Choose a section you're interested in, but first, please read the [user agreement](https://example.com/tos)."
+            "Choose a section you're interested in, but first, please read the [user agreement](https://telegra.ph/Polzovatelskoe-soglashenie--Terms-of-Service-08-07)."
         )
     },
     "welcome_back": {
