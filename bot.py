@@ -22,7 +22,8 @@ def get_text(key: str, lang: str) -> str:
 
 def get_user_lang(chat_id: int) -> str:
     """Gets the user's selected language, defaulting to Russian."""
-    return get_user_data(chat_id).get("language", "ru")
+    lang = get_user_data(chat_id).get("language")
+    return lang if lang else "ru"
 
 # Настройка логирования
 logging.basicConfig(
