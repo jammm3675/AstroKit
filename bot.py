@@ -1020,11 +1020,6 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
     
     try:
-    except BadRequest as e:
-        logger.error(f"Error showing premium menu: {e}")
-    except BadRequest as e:
-        logger.error(f"Error showing premium menu: {e}")
-        # If deletion fails, try editing
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
@@ -1032,6 +1027,8 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             reply_markup=premium_menu_keyboard(lang),
             parse_mode="Markdown"
         )
+    except BadRequest as e:
+        logger.error(f"Error showing premium menu: {e}")
 
 async def support_with_stars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Sends an invoice for 15 stars."""
