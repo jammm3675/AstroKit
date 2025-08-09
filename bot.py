@@ -9,8 +9,8 @@ import json
 from datetime import datetime, date, timedelta
 import pytz
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, PollHandler, ChatMemberHandler, filters
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, SuccessfulPayment
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, ChatMemberHandler, filters, PreCheckoutQueryHandler, MessageHandler
 from telegram.error import TelegramError, BadRequest, Conflict
 from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP
 
@@ -79,8 +79,8 @@ crypto_prices = {
 # Кэш для API запросов
 api_cache = {
     "last_update": None,
-    "cache_duration": 300,  # 5 минут
-    "failed_attempts": 0,
+    "cache_duration": 290,  # 4 минуты 50 секунд, чуть меньше интервала обновления
+    "failed_attempts": 0, # Оставлено для обратной совместимости кэша
     "current_source": "coingecko"
 }
 
@@ -126,30 +126,44 @@ FALLBACK_DATA = {
 }
 
 def generate_bilingual_horoscopes():
-    """Generates a database of horoscopes in both Russian and English."""
+    """Generates a database of structured and grammatically correct horoscopes."""
+    templates = [
+        {
+            "ru": "Сегодня звезды благоволят вашим начинаниям в {theme}. Рекомендуется {action} {asset}. День обещает быть удачным, доверяйте своей интуиции!",
+            "en": "Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!"
+        },
+        {
+            "ru": "Будьте осторожны с {theme} сегодня. Звезды советуют {action} {asset}. Внимательность к деталям поможет избежать потерь.",
+            "en": "Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses."
+        },
+        {
+            "ru": "Отличное время для изучения {theme}. Рассмотрите возможность {action} {asset}. Удача на вашей стороне, но не забывайте проверять информацию.",
+            "en": "A great time to study {theme}. Consider the possibility of {action} {asset}. Luck is on your side, but don't forget to verify information."
+        },
+        {
+            "ru": "Ваша энергия сегодня на пике, что идеально для {theme}. Звезды предлагают {action} {asset}. Смелые решения могут принести неожиданную прибыль.",
+            "en": "Your energy is at its peak today, which is perfect for {theme}. The stars suggest to {action} {asset}. Bold decisions can bring unexpected profits."
+        },
+        {
+            "ru": "Сегодняшний день подходит для анализа и планирования в сфере {theme}. Не спешите {action} {asset}, лучше подготовьтесь к будущим возможностям.",
+            "en": "Today is a good day for analysis and planning in {theme}. Don't rush to {action} {asset}; it's better to prepare for future opportunities."
+        }
+    ]
     themes = [
-        {"ru": "инвестициям", "en": "investments"}, {"ru": "трейдингу", "en": "trading"},
-        {"ru": "стейкингу", "en": "staking"}, {"ru": "NFT", "en": "NFTs"},
-        {"ru": "DeFi", "en": "DeFi"}, {"ru": "майнингу", "en": "mining"}
+        {"ru": "DeFi", "en": "DeFi"}, {"ru": "NFT-сектора", "en": "the NFT sector"},
+        {"ru": "долгосрочных инвестиций", "en": "long-term investments"}, {"ru": "дейтрейдинга", "en": "day trading"},
+        {"ru": "стейкинга", "en": "staking"}, {"ru": "поиска новых проектов", "en": "searching for new projects"}
     ]
     actions = [
-        {"ru": "инвестируйте в", "en": "invest in"}, {"ru": "избегайте", "en": "avoid"},
-        {"ru": "изучите", "en": "study"}, {"ru": "продавайте", "en": "sell"},
-        {"ru": "покупайте", "en": "buy"}, {"ru": "холдите", "en": "HODL"}
+        {"ru": "присмотреться к", "en": "take a closer look at"}, {"ru": "избегать рискованных операций с", "en": "avoid risky operations with"},
+        {"ru": "увеличить позиции в", "en": "increase positions in"}, {"ru": "зафиксировать прибыль от", "en": "take profits from"},
+        {"ru": "провести исследование по", "en": "conduct research on"}
     ]
     assets = [
-        "BTC", "TON", "ETH", "SOL", "DOGE", "memecoins", "altcoins", "blue chips",
-        "new projects", "infrastructure tokens", "L2 solutions"
+        "BTC", "TON", "ETH", "SOL", "альткоинами", "мем-коинами", "инфраструктурными токенами", "L2-решениями"
     ]
-    moods = [
-        {"ru": "удачный день", "en": "a lucky day"}, {"ru": "осторожный день", "en": "a cautious day"},
-        {"ru": "рискованный период", "en": "a risky period"}, {"ru": "время возможностей", "en": "a time of opportunity"}
-    ]
-    endings = [
-        {"ru": "удача на вашей стороне", "en": "luck is on your side"},
-        {"ru": "будьте внимательны к деталям", "en": "be attentive to details"},
-        {"ru": "доверяйте интуиции", "en": "trust your intuition"},
-        {"ru": "проверяйте информацию", "en": "verify information"}
+    assets_en = [
+        "BTC", "TON", "ETH", "SOL", "altcoins", "memecoins", "infrastructure tokens", "L2 solutions"
     ]
 
     horoscopes = {"ru": {}, "en": {}}
@@ -157,27 +171,36 @@ def generate_bilingual_horoscopes():
     emojis = ["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡️", "🎯", "🤖", "🌔"]
     random.shuffle(emojis)
 
+    asset_map = dict(zip(assets, assets_en))
+
     for i, (sign_ru, sign_en) in enumerate(zodiac_pairs):
         variants_ru, variants_en = [], []
         for _ in range(30):  # 30 variants for each sign
-            theme, action, mood, ending = random.choice(themes), random.choice(actions), random.choice(moods), random.choice(endings)
-            asset = random.choice(assets)
+            template = random.choice(templates)
+            theme = random.choice(themes)
+            action = random.choice(actions)
+            asset_ru = random.choice(assets)
+            asset_en = asset_map[asset_ru]
             emoji = emojis[i % len(emojis)]
 
-            text_ru = (
-                f"{emoji} *{sign_ru}:*\n\n"
-                f"Сегодня *{mood['ru']}* для крипто-активов! Звезды советуют: "
-                f"*{action['ru']} {asset}.*\n"
-                f"Особое внимание уделите *{theme['ru']}*. {ending['ru'].capitalize()}!"
+            # Format Russian text
+            text_ru = template["ru"].format(
+                theme=theme["ru"],
+                action=action["ru"],
+                asset=asset_ru
             )
-            text_en = (
-                f"{emoji} *{sign_en}:*\n\n"
-                f"Today is *{mood['en']}* for crypto assets! The stars advise: "
-                f"*{action['en']} {asset}.*\n"
-                f"Pay special attention to *{theme['en']}*. {ending['en'].capitalize()}!"
+            full_text_ru = f"{emoji} *{sign_ru}:*\n\n{text_ru}"
+
+            # Format English text
+            text_en = template["en"].format(
+                theme=theme["en"],
+                action=action["en"],
+                asset=asset_en
             )
-            variants_ru.append(text_ru)
-            variants_en.append(text_en)
+            full_text_en = f"{emoji} *{sign_en}:*\n\n{text_en}"
+
+            variants_ru.append(full_text_ru)
+            variants_en.append(full_text_en)
 
         horoscopes["ru"][sign_ru] = variants_ru
         horoscopes["en"][sign_en] = variants_en
@@ -226,46 +249,50 @@ def update_user_horoscope(chat_id: int):
         logger.info(f"Content indices updated for user {chat_id} for {today}")
 
 def update_crypto_prices():
-    """Обновляет курсы криптовалют в реальном времени с множественными источниками"""
+    """Обновляет курсы криптовалют, ротируя источники для надежности."""
     try:
         # Проверяем, нужно ли обновлять данные из API
         if api_cache["last_update"] is not None and \
            (datetime.now() - api_cache["last_update"]).total_seconds() < api_cache["cache_duration"]:
-            logger.info("Используем кэшированные данные курсов.")
+            logger.info("Используем кэшированные данные курсов (в пределах окна кэширования).")
             return
 
-        # Определяем текущий источник для обновления
-        current_source = api_cache["current_source"]
+        # Ротация источников API для распределения нагрузки
+        sources = ["coingecko", "binance", "cryptocompare"]
         
-        if current_source == "coingecko":
-            success = _update_from_coingecko()
-        elif current_source == "binance":
-            success = _update_from_binance()
-        elif current_source == "cryptocompare":
-            success = _update_from_cryptocompare()
-        else:
-            logger.warning(f"Неизвестный источник API: {current_source}. Используем кэшированные данные.")
-            return
+        # Начинаем со следующего источника в списке
+        _switch_api_source()
 
-        if success:
-            api_cache["last_update"] = datetime.now()
-            api_cache["failed_attempts"] = 0
-            logger.info(f"Курсы успешно обновлены от {current_source}")
-            # Сохраняем кэш после успешного обновления
-            save_cache_to_file()
-        else:
-            api_cache["failed_attempts"] += 1
-            if api_cache["failed_attempts"] >= 3:
-                logger.error("Слишком много неудачных запросов. Используем резервные данные.")
-                _use_fallback_data()
+        initial_source = api_cache["current_source"]
+
+        for i in range(len(sources)):
+            current_source = api_cache["current_source"]
+            logger.info(f"Попытка обновления курсов от источника: {current_source}")
+
+            success = False
+            if current_source == "coingecko":
+                success = _update_from_coingecko()
+            elif current_source == "binance":
+                success = _update_from_binance()
+            elif current_source == "cryptocompare":
+                success = _update_from_cryptocompare()
+
+            if success:
+                api_cache["last_update"] = datetime.now()
+                logger.info(f"Курсы успешно обновлены от {current_source}")
                 save_cache_to_file()
+                return # Успешно, выходим из функции
             else:
-                # Переключаемся на следующий источник
+                logger.warning(f"Не удалось обновить от {current_source}. Переключение на следующий источник.")
                 _switch_api_source()
-                logger.info(f"Переключение на источник: {api_cache['current_source']}")
+
+        # Если все источники не сработали
+        logger.error("Все источники API недоступны. Используем резервные данные.")
+        _use_fallback_data()
+        save_cache_to_file()
 
     except Exception as e:
-        logger.error(f"Ошибка получения курсов: {e}")
+        logger.error(f"Критическая ошибка при обновлении курсов: {e}")
         _use_fallback_data()
 
 def _update_from_coingecko():
@@ -747,49 +774,74 @@ async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYP
     # Show updated settings menu
     await show_settings_menu(update, context)
 
-async def send_daily_poll_job(context: ContextTypes.DEFAULT_TYPE):
-    """Job to send a poll to all users with notifications enabled."""
-    logger.info("Starting daily poll job...")
+def feedback_keyboard(lang: str):
+    """Creates the feedback keyboard."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(get_text("feedback_option_accurate", lang), callback_data="feedback_accurate"),
+            InlineKeyboardButton(get_text("feedback_option_inaccurate", lang), callback_data="feedback_inaccurate"),
+            InlineKeyboardButton(get_text("feedback_option_profit", lang), callback_data="feedback_profit"),
+        ]
+    ])
+
+def feedback_close_keyboard(lang: str):
+    """Creates the close button for the feedback response."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("feedback_close_button", lang), callback_data="feedback_close")]
+    ])
+
+async def send_daily_feedback_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to send a feedback request to all users with notifications enabled."""
+    logger.info("Starting daily feedback job...")
     for chat_id, data in user_data.items():
         if data.get("notifications"):
             lang = data.get("language", "ru")
-            question = get_text("poll_question", lang)
-            options = [
-                get_text("poll_option_accurate", lang),
-                get_text("poll_option_inaccurate", lang),
-                get_text("poll_option_profit", lang),
-            ]
+            question = get_text("feedback_question", lang)
             try:
-                await context.bot.send_poll(
+                await context.bot.send_message(
                     chat_id=chat_id,
-                    question=question,
-                    options=options,
-                    is_anonymous=True, # The poll is anonymous as requested
-                    allows_multiple_answers=False,
+                    text=question,
+                    reply_markup=feedback_keyboard(lang)
                 )
-                logger.info(f"Sent daily poll to {chat_id}")
+                logger.info(f"Sent daily feedback request to {chat_id}")
             except Exception as e:
-                logger.error(f"Failed to send poll to {chat_id}: {e}")
-    logger.info("Daily poll job finished.")
+                logger.error(f"Failed to send feedback request to {chat_id}: {e}")
+    logger.info("Daily feedback job finished.")
 
-async def handle_poll_answer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles a user's response to the daily poll."""
-    poll_answer = update.poll_answer
-    user = poll_answer.user
-    chat_id = user.id
+async def handle_feedback_response(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles a user's response to the feedback request."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    # The poll is anonymous, so we don't know the answer. We just thank the user.
-    thank_you_text = get_text("poll_thank_you", lang)
+    thank_you_text = get_text("feedback_thank_you", lang)
+
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=thank_you_text,
+            reply_markup=feedback_close_keyboard(lang)
+        )
+        logger.info(f"Handled feedback from {chat_id}")
+    except BadRequest as e:
+        logger.error(f"Error handling feedback response: {e}")
+
+async def handle_feedback_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Deletes the feedback message."""
+    query = update.callback_query
+    await query.answer()
     
     try:
-        message = await context.bot.send_message(chat_id=chat_id, text=thank_you_text)
-        # Schedule the thank you message to be deleted after 10 seconds
-        await asyncio.sleep(10)
-        await context.bot.delete_message(chat_id=chat_id, message_id=message.message_id)
-        logger.info(f"Sent and deleted thank you message for poll answer to {chat_id}")
-    except Exception as e:
-        logger.error(f"Failed to send/delete thank you message for poll to {chat_id}: {e}")
+        await context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
+        logger.info(f"Closed feedback message for {query.message.chat_id}")
+    except BadRequest as e:
+        logger.error(f"Error closing feedback message: {e}")
 
 # --- Channel Broadcast Feature ---
 
@@ -927,8 +979,26 @@ async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Daily broadcast job finished.")
 
 
+def premium_menu_keyboard(lang: str):
+    """Creates the support/premium menu keyboard."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                get_text("premium_button_ton", lang),
+                url="ton://transfer/UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_?amount=100000000&text=Support(Поддержать)"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                get_text("premium_button_stars", lang),
+                callback_data="support_stars"
+            )
+        ],
+        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
+    ])
+
 async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Shows the premium menu."""
+    """Shows the premium menu with support options."""
     query = update.callback_query
     await query.answer()
     
@@ -936,21 +1006,79 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     lang = get_user_lang(chat_id)
 
     text = (
-        f"{get_text('premium_menu_title', lang)}\n\n"
+        f"*{get_text('premium_menu_title', lang)}*\n\n"
         f"{get_text('premium_menu_description', lang)}"
     )
     
     try:
+        # Delete the previous message to provide a clean slate
+        await context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
+        # Send a new message with the premium options
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=text,
+            reply_markup=premium_menu_keyboard(lang),
+            parse_mode="Markdown"
+        )
+    except BadRequest as e:
+        logger.error(f"Error showing premium menu: {e}")
+        # If deletion fails, try editing
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
-            parse_mode="Markdown",
-            disable_web_page_preview=True
+            reply_markup=premium_menu_keyboard(lang),
+            parse_mode="Markdown"
         )
-    except BadRequest as e:
-        logger.error(f"Error showing premium menu: {e}")
+
+async def support_with_stars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Sends an invoice for 15 stars."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = query.message.chat_id
+    payload = "astrokit-support-stars-15"
+    title = "Поддержка AstroKit"
+    description = "Ваш вклад помогает нам делать прогнозы точнее!"
+    prices = [LabeledPrice("15 ⭐️", 15)]
+
+    try:
+        await context.bot.send_invoice(
+            chat_id=chat_id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token="", # Not needed for stars
+            currency="XTR",
+            prices=prices
+        )
+    except Exception as e:
+        logger.error(f"Error sending stars invoice: {e}")
+
+async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Answers the pre-checkout query."""
+    query = update.pre_checkout_query
+    if query.invoice_payload != "astrokit-support-stars-15":
+        await query.answer(ok=False, error_message="Что-то пошло не так...")
+    else:
+        await query.answer(ok=True)
+
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Confirms the successful payment."""
+    chat_id = update.message.chat.id
+    lang = get_user_lang(chat_id)
+
+    # Clean up previous messages if possible (e.g., the invoice)
+    # This is tricky as we don't have the invoice message_id here.
+    # A simple thank you message is more robust.
+
+    thank_you_text = get_text("payment_thank_you", lang)
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=thank_you_text,
+        reply_markup=back_to_menu_keyboard(lang)
+    )
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Main callback query handler."""
@@ -974,10 +1102,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await toggle_notifications(update, context)
         elif data == "premium_menu":
             await show_premium_menu(update, context)
+        elif data == "support_stars":
+            await support_with_stars(update, context)
         elif data.startswith("set_lang_"):
             await set_language(update, context)
         elif data == "change_language":
             await change_language(update, context)
+        elif data.startswith("feedback_"):
+            if data == "feedback_close":
+                await handle_feedback_close(update, context)
+            else:
+                await handle_feedback_response(update, context)
 
     except Exception as e:
         logger.error(f"Error in button handler: {e}")
@@ -1068,23 +1203,25 @@ def main() -> None:
     application.add_handler(CommandHandler("astro", astro_command, filters=filters.ALL))
     application.add_handler(CommandHandler("day", day_command, filters=filters.ALL))
     application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(PollHandler(handle_poll_answer))
     application.add_handler(ChatMemberHandler(handle_new_chat_member, chat_member_types=ChatMemberHandler.MY_CHAT_MEMBER))
+    # Payment handlers
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     logger.info("✅ Обработчики зарегистрированы")
 
     # Задачи JobQueue
     if application.job_queue:
         moscow_tz = pytz.timezone("Europe/Moscow")
 
-        # Schedule daily poll job
-        poll_time = datetime.strptime("21:00", "%H:%M").time().replace(tzinfo=moscow_tz)
-        application.job_queue.run_daily(send_daily_poll_job, time=poll_time, name="daily_poll_job")
-        logger.info("📅 Daily poll job scheduled for 21:00 Moscow time.")
+        # Schedule daily feedback job
+        feedback_time = datetime.strptime("12:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        application.job_queue.run_daily(send_daily_feedback_job, time=feedback_time, name="daily_feedback_job")
+        logger.info("📅 Daily feedback job scheduled for 12:00 Moscow time.")
 
         # Schedule daily broadcast job
-        broadcast_time = datetime.strptime("07:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        broadcast_time = datetime.strptime("00:00", "%H:%M").time().replace(tzinfo=moscow_tz)
         application.job_queue.run_daily(broadcast_job, time=broadcast_time, name="daily_broadcast_job")
-        logger.info("📅 Daily broadcast job scheduled for 07:00 Moscow time.")
+        logger.info("📅 Daily broadcast job scheduled for 00:00 Moscow time.")
 
         # Обновление курсов криптовалют каждые 5 минут
         application.job_queue.run_repeating(

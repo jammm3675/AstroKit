@@ -121,24 +121,26 @@ TEXTS = {
         "en": "🌐 Change Language"
     },
 
-    # --- Premium ---
+    # --- Premium / Support ---
     "premium_menu_title": {
         "ru": "✨ *Поддержать автора*",
-        "en": "✨ *Support the author*"
+        "en": "✨ *Support the Author*"
     },
     "premium_menu_description": {
-        "ru": (
-            "Если вам нравится AstroKit и вы хотите поддержать автора, вы можете:\n\n"
-            "🎁 Отправить подарок в Telegram на @CryptoAstroSupport\n\n"
-            "💎 Отправить TON/USDT на адрес:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
-            "Ваша поддержка помогает развивать проект! Спасибо! 🙏"
-        ),
-        "en": (
-            "If you enjoy AstroKit and would like to support the author, you can:\n\n"
-            "🎁 Send a gift on Telegram to @CryptoAstroSupport\n\n"
-            "💎 Send TON/USDT to this address:\n`UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_`\n\n"
-            "Your support helps the project grow! Thank you! 🙏"
-        )
+        "ru": "Если вам нравится AstroKit, вы можете поддержать автора, отправив немного TON или используя Telegram Stars. Ваша поддержка помогает развивать проект! 🙏",
+        "en": "If you enjoy AstroKit, you can support the author by sending some TON or using Telegram Stars. Your support helps the project grow! 🙏"
+    },
+    "premium_button_ton": {
+        "ru": "Отправить 0.1 TON",
+        "en": "Send 0.1 TON"
+    },
+    "premium_button_stars": {
+        "ru": "Подарить 15 ⭐️",
+        "en": "Gift 15 ⭐️"
+    },
+    "payment_thank_you": {
+        "ru": "Огромное спасибо за вашу поддержку! Это очень много значит для нас. ✨",
+        "en": "Thank you so much for your support! It means a lot to us. ✨"
     },
 
     # --- Generic Error ---
@@ -193,26 +195,30 @@ TEXTS = {
         ]
     },
 
-    # --- Poll Notification ---
-    "poll_question": {
-        "ru": "Как вам сегодняшний прогноз?",
-        "en": "How was today's forecast?"
+    # --- Feedback Notification ---
+    "feedback_question": {
+        "ru": "Как вы оцените сегодняшний прогноз?",
+        "en": "How would you rate today's forecast?"
     },
-    "poll_option_accurate": {
+    "feedback_option_accurate": {
         "ru": "👍 Точный",
         "en": "👍 Accurate"
     },
-    "poll_option_inaccurate": {
+    "feedback_option_inaccurate": {
         "ru": "👎 Не совпал",
-        "en": "👎 Inaccurate"
+        "en": "👎 Didn't match"
     },
-    "poll_option_profit": {
+    "feedback_option_profit": {
         "ru": "💰 Принес прибыль",
-        "en": "💰 It was profitable"
+        "en": "💰 Brought profit"
     },
-    "poll_thank_you": {
-        "ru": "Спасибо за ваш отзыв! Мы учтем его для улучшения прогнозов. ✨",
-        "en": "Thank you for your feedback! We'll use it to improve our forecasts. ✨"
+    "feedback_thank_you": {
+        "ru": "Спасибо за то, что делаете наши прогнозы более точными! ✨",
+        "en": "Thank you for making our forecasts more accurate! ✨"
+    },
+    "feedback_close_button": {
+        "ru": "Закрыть",
+        "en": "Close"
     },
     "astro_command_title": {
         "ru": "КРИПТОГОРОСКОП",
