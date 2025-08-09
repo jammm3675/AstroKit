@@ -10,12 +10,12 @@ ZODIAC_CALLBACK_MAP = dict(zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"]))
 TEXTS = {
     # --- Initial data Fallbacks ---
     "daily_data_advice_fallback": {
-        "ru": "Ежедневный совет еще не готов, загляните после 07:00 по Москве!",
-        "en": "The daily advice is not ready yet, check back after 07:00 Moscow time!"
+        "ru": "Ежедневный совет еще не готов, загляните после 00:00 по Москве!",
+        "en": "The daily advice is not ready yet, check back after 00:00 Moscow time!"
     },
     "daily_data_horoscope_fallback": {
-        "ru": "Гороскоп на сегодня еще не готов, загляните после 07:00 по Москве!",
-        "en": "Today's horoscope is not ready yet, check back after 07:00 Moscow time!"
+        "ru": "Гороскоп на сегодня еще не готов, загляните после 00:00 по Москве!",
+        "en": "Today's horoscope is not ready yet, check back after 00:00 Moscow time!"
     },
 
     # --- Start and Language Selection ---
@@ -52,6 +52,7 @@ TEXTS = {
     "settings_button": {"ru": "⚙️ Настройки", "en": "⚙️ Settings"},
     "premium_button": {"ru": "✨ Поддержать", "en": "✨ Support"},
     "main_menu_button": {"ru": "⬅️ Назад", "en": "⬅️ Back"},
+    "horoscope_back_button": {"ru": "Главное меню", "en": "Main Menu"},
 
     # --- Horoscope ---
     "zodiac_select_title": {
@@ -90,31 +91,19 @@ TEXTS = {
         "ru": "⚙️ *Настройки*",
         "en": "⚙️ *Settings*"
     },
-    "notifications_title": {
-        "ru": "⚙️ *Настройки уведомлений*",
-        "en": "⚙️ *Notification Settings*"
+    "polls_status_line": {
+        "ru": "🔔 Ежедневные опросы: {status}",
+        "en": "🔔 Daily polls: {status}"
     },
-    "notifications_status_line": {
-        "ru": "🔔 Текущий статус: {status}",
-        "en": "🔔 Current status: {status}"
+    "polls_on": {"ru": "включены ✅", "en": "enabled ✅"},
+    "polls_off": {"ru": "выключены ❌", "en": "disabled ❌"},
+    "toggle_polls_on_button": {
+        "ru": "🔔 Включить опросы",
+        "en": "🔔 Enable polls"
     },
-    "notifications_on": {"ru": "включены ✅", "en": "enabled ✅"},
-    "notifications_off": {"ru": "выключены ❌", "en": "disabled ❌"},
-    "notification_time_line": {
-        "ru": "⏰ Время уведомлений: {time}",
-        "en": "⏰ Notification time: {time}"
-    },
-    "manage_notifications_prompt": {
-        "ru": "Управляйте астро-оповещениями:",
-        "en": "Manage astro-alerts:"
-    },
-    "toggle_notifications_on_button": {
-        "ru": "🔔 Включить уведомления",
-        "en": "🔔 Enable notifications"
-    },
-    "toggle_notifications_off_button": {
-        "ru": "🔕 Выключить уведомления",
-        "en": "🔕 Disable notifications"
+    "toggle_polls_off_button": {
+        "ru": "🔕 Выключить опросы",
+        "en": "🔕 Disable polls"
     },
     "change_language_button": {
         "ru": "🌐 Сменить язык",
@@ -174,24 +163,6 @@ TEXTS = {
             "🔍 Always check contracts via blockchain explorers before interacting with new projects",
             "🧩 Separate your funds for cold storage, staking, and active trading operations",
             "⚖️ Use a risk management strategy: determine your position size and stop-losses before a trade"
-        ]
-    },
-
-    # --- Push Notifications ---
-    "notification_alerts": {
-        "ru": [
-            "⚠️ *АСТРО-ТРЕВОГА!*\n\nМеркурий ретроградный → Ожидайте технических сбоев на биржах и кошельках. Рекомендуется отложить крупные транзакции!",
-            "🌟 *ЗВЕЗДНАЯ ВОЗМОЖНОСТЬ!*\n\nЮпитер входит в знак Стрельца → Благоприятный период для долгосрочных инвестиций!",
-            "🔮 *ПРЕДУПРЕЖДЕНИЕ!*\n\nЛуна в Скорпионе → Повышенная волатильность на рынке! Будьте осторожны с кредитным плечом.",
-            "💫 *АСТРО-ПРОГНОЗ!*\n\nВенера сближается с Сатурном → Идеальное время для ребалансировки портфеля!",
-            "🌕 *ОСОБЫЙ ПЕРИОД!*\n\nПолнолуние в Водолее → Ожидайте неожиданных рыночных движений! Готовьтесь к возможным коррекциям."
-        ],
-        "en": [
-            "⚠️ *ASTRO-ALERT!*\n\nThe retrograde Mercury → Expect technical glitches on exchanges and wallets. It is recommended to postpone large transactions!",
-            "🌟 *STELLAR OPPORTUNITY!*\n\nJupiter enters Sagittarius → A favorable period for long-term investments!",
-            "🔮 *WARNING!*\n\nThe Moon in Scorpio → Increased market volatility! Be careful with leverage.",
-            "💫 *ASTRO-FORECAST!*\n\nVenus approaches Saturn → The perfect time to rebalance your portfolio!",
-            "🌕 *SPECIAL PERIOD!*\n\nFull Moon in Aquarius → Expect unexpected market movements! Prepare for possible corrections."
         ]
     },
 

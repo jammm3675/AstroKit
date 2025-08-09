@@ -214,12 +214,16 @@ def get_user_data(chat_id: int) -> dict:
     if chat_id not in user_data:
         user_data[chat_id] = {
             "language": None,
-            "notifications": True,
+            "polls_enabled": True,
             "last_update": None,
             "tip_index": None,
             "horoscope_indices": {},
             "is_new_user": True
         }
+    # Backward compatibility for users who have "notifications" key
+    if "notifications" in user_data[chat_id]:
+        user_data[chat_id]["polls_enabled"] = user_data[chat_id].pop("notifications")
+
     return user_data[chat_id]
 
 def update_user_horoscope(chat_id: int):
@@ -477,6 +481,12 @@ def back_to_menu_keyboard(lang: str):
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
 
+def horoscope_back_keyboard(lang: str):
+    """Creates a specific back button for the horoscope view."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("horoscope_back_button", lang), callback_data="main_menu")]
+    ])
+
 def back_to_premium_menu_keyboard(lang: str):
     """Creates a back button to the premium menu."""
     return InlineKeyboardMarkup([
@@ -506,13 +516,13 @@ def zodiac_keyboard(lang: str):
 def settings_keyboard(chat_id: int, lang: str):
     """Creates the settings keyboard in the specified language."""
     user_info = get_user_data(chat_id)
-    notifications_on = user_info.get("notifications", True)
+    polls_on = user_info.get("polls_enabled", True)
     
-    toggle_key = "toggle_notifications_off_button" if notifications_on else "toggle_notifications_on_button"
+    toggle_key = "toggle_polls_off_button" if polls_on else "toggle_polls_on_button"
     toggle_text = get_text(toggle_key, lang)
     
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
+        [InlineKeyboardButton(toggle_text, callback_data="toggle_polls")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
@@ -681,7 +691,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=horoscope_back_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -725,12 +735,12 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lang = get_user_lang(chat_id)
     
     user_info = get_user_data(chat_id)
-    notifications_on = user_info.get("notifications", True)
-    status_key = "notifications_on" if notifications_on else "notifications_off"
+    polls_on = user_info.get("polls_enabled", True)
+    status_key = "polls_on" if polls_on else "polls_off"
     
     text = (
-        f" *{get_text('settings_title', lang)}*\n\n"
-        f"{get_text('notifications_status_line', lang).format(status=get_text(status_key, lang))}"
+        f"*{get_text('settings_title', lang)}*\n\n"
+        f"{get_text('polls_status_line', lang).format(status=get_text(status_key, lang))}"
     )
     
     try:
@@ -757,19 +767,18 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=language_keyboard()
     )
 
-async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Toggles user notifications on or off."""
+async def toggle_polls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Toggles user polls on or off."""
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat_id
-    lang = get_user_lang(chat_id)
     
     user_info = get_user_data(chat_id)
-    new_status = not user_info.get("notifications", True)
-    user_info["notifications"] = new_status
+    new_status = not user_info.get("polls_enabled", True)
+    user_info["polls_enabled"] = new_status
     
     status_text = "enabled" if new_status else "disabled"
-    logger.info(f"Notifications for user {chat_id} are now {status_text}")
+    logger.info(f"Polls for user {chat_id} are now {status_text}")
     
     # Show updated settings menu
     await show_settings_menu(update, context)
@@ -791,10 +800,10 @@ def feedback_close_keyboard(lang: str):
     ])
 
 async def send_daily_feedback_job(context: ContextTypes.DEFAULT_TYPE):
-    """Job to send a feedback request to all users with notifications enabled."""
+    """Job to send a feedback request to all users with polls enabled."""
     logger.info("Starting daily feedback job...")
     for chat_id, data in user_data.items():
-        if data.get("notifications"):
+        if data.get("polls_enabled"):
             lang = data.get("language", "ru")
             question = get_text("feedback_question", lang)
             try:
@@ -1011,15 +1020,8 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
     
     try:
-        # Delete the previous message to provide a clean slate
-        await context.bot.delete_message(chat_id=chat_id, message_id=query.message.message_id)
-        # Send a new message with the premium options
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=text,
-            reply_markup=premium_menu_keyboard(lang),
-            parse_mode="Markdown"
-        )
+    except BadRequest as e:
+        logger.error(f"Error showing premium menu: {e}")
     except BadRequest as e:
         logger.error(f"Error showing premium menu: {e}")
         # If deletion fails, try editing
@@ -1098,8 +1100,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await show_learning_tip(update, context)
         elif data == "settings_menu":
             await show_settings_menu(update, context)
-        elif data == "toggle_notifications":
-            await toggle_notifications(update, context)
+        elif data == "toggle_polls":
+            await toggle_polls(update, context)
         elif data == "premium_menu":
             await show_premium_menu(update, context)
         elif data == "support_stars":
