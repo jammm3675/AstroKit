@@ -12,7 +12,7 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, SuccessfulPayment
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, ChatMemberHandler, filters, PreCheckoutQueryHandler, MessageHandler
 from telegram.error import TelegramError, BadRequest, Conflict
-from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP, ZODIAC_EMOJIS
+from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP, ZODIAC_EMOJIS, ZODIAC_THEMATIC_EMOJIS
 
 # --- Helper Functions ---
 
@@ -159,22 +159,22 @@ def generate_multilingual_horoscopes():
         {
             "ru": "Сегодня звезды благоволят вашим начинаниям в {theme}. Рекомендуется {action} {asset}. День обещает быть удачным, доверяйте своей интуиции!",
             "en": "Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!",
-            "zh": "[zh] Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!"
+            "zh": "今天，星象有利于您在{theme}的努力。建议{action}{asset}。今天注定会成功，相信您的直觉！"
         },
         {
             "ru": "Будьте осторожны с {theme} сегодня. Звезды советуют {action} {asset}. Внимательность к деталям поможет избежать потерь.",
             "en": "Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses.",
-            "zh": "[zh] Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses."
+            "zh": "今天在{theme}方面要小心。星象建议{action}{asset}。注意细节将有助于避免损失。"
         },
         {
             "ru": "Движение BTC создает фон для TON. Отличное время для изучения {theme}. Рассмотрите возможность {action} {asset}.",
             "en": "BTC's movement is setting the stage for TON. A great time to study {theme}. Consider the possibility of {action} {asset}.",
-            "zh": "[zh] BTC's movement is setting the stage for TON. A great time to study {theme}. Consider the possibility of {action} {asset}."
+            "zh": "BTC的走势正在为TON铺平道路。现在是研究{theme}的大好时机。考虑{action}{asset}的可能性。"
         },
         {
             "ru": "Экосистема TON сегодня в центре внимания. Ваша энергия на пике, что идеально для {theme}. Звезды предлагают {action} {asset}.",
             "en": "The TON ecosystem is in the spotlight today. Your energy is at its peak, which is perfect for {theme}. The stars suggest to {action} {asset}.",
-            "zh": "[zh] The TON ecosystem is in the spotlight today. Your energy is at its peak, which is perfect for {theme}. The stars suggest to {action} {asset}."
+            "zh": "TON生态系统今天备受关注。您的精力充沛，非常适合{theme}。星象建议{action}{asset}。"
         }
     ]
     themes = [
@@ -186,28 +186,27 @@ def generate_multilingual_horoscopes():
         {"ru": "корреляции TON и BTC", "en": "the correlation between TON and BTC", "zh": "TON与BTC的相关性"}
     ]
     actions = [
-        {"ru": "присмотреться к", "en": "take a closer look at", "zh": "仔细研究"},
-        {"ru": "искать новые возможности в", "en": "look for new opportunities in", "zh": "寻找新机会"},
-        {"ru": "увеличить позиции в", "en": "increase positions in", "zh": "增加仓位"},
-        {"ru": "зафиксировать прибыль от", "en": "take profits from", "zh": "获利了结"},
-        {"ru": "провести исследование по", "en": "conduct research on", "zh": "进行研究"},
-        {"ru": "пересмотреть свой портфель в", "en": "review your portfolio in", "zh": "审查您的投资组合"}
+        {"ru": "присмотреться к", "en": "take a closer look at", "zh": "仔细研究", "case": "dative"},
+        {"ru": "искать новые возможности в", "en": "look for new opportunities in", "zh": "寻找新机会", "case": "prepositional"},
+        {"ru": "увеличить позиции в", "en": "increase positions in", "zh": "增加仓位", "case": "prepositional"},
+        {"ru": "зафиксировать прибыль от", "en": "take profits from", "zh": "获利了结", "case": "genitive"},
+        {"ru": "провести исследование по", "en": "conduct research on", "zh": "进行研究", "case": "dative"}
     ]
     assets = {
-        "BTC": {"ru": "BTC", "en": "BTC", "zh": "BTC"},
-        "TON": {"ru": "TON", "en": "TON", "zh": "TON"},
-        "ETH": {"ru": "ETH", "en": "ETH", "zh": "ETH"},
-        "SOL": {"ru": "SOL", "en": "SOL", "zh": "SOL"},
-        "альткоинами": {"ru": "альткоинами", "en": "altcoins", "zh": "山寨币"},
-        "мем-коинами": {"ru": "мем-коинами", "en": "memecoins", "zh": "模因币"},
-        "инфраструктурными токенами": {"ru": "инфраструктурными токенами", "en": "infrastructure tokens", "zh": "基础设施代币"},
-        "L2-решениями": {"ru": "L2-решениями", "en": "L2 solutions", "zh": "L2解决方案"}
+        "BTC": {"en": "BTC", "zh": "BTC", "ru": {"nominative": "BTC", "dative": "BTC", "prepositional": "BTC", "genitive": "BTC"}},
+        "TON": {"en": "TON", "zh": "TON", "ru": {"nominative": "TON", "dative": "TON", "prepositional": "TON", "genitive": "TON"}},
+        "ETH": {"en": "ETH", "zh": "ETH", "ru": {"nominative": "ETH", "dative": "ETH", "prepositional": "ETH", "genitive": "ETH"}},
+        "SOL": {"en": "SOL", "zh": "SOL", "ru": {"nominative": "SOL", "dative": "SOL", "prepositional": "SOL", "genitive": "SOL"}},
+        "altcoins": {"en": "altcoins", "zh": "山寨币", "ru": {"nominative": "альткоины", "dative": "альткоинам", "prepositional": "альткоинах", "genitive": "альткоинов"}},
+        "memecoins": {"en": "memecoins", "zh": "模因币", "ru": {"nominative": "мем-коины", "dative": "мем-коинам", "prepositional": "мем-коинах", "genitive": "мем-коинов"}},
+        "infrastructure_tokens": {"en": "infrastructure tokens", "zh": "基础设施代币", "ru": {"nominative": "инфраструктурные токены", "dative": "инфраструктурным токенам", "prepositional": "инфраструктурных токенах", "genitive": "инфраструктурных токенов"}},
+        "l2_solutions": {"en": "L2 solutions", "zh": "L2解决方案", "ru": {"nominative": "L2-решения", "dative": "L2-решениям", "prepositional": "L2-решениях", "genitive": "L2-решений"}}
     }
 
     horoscopes = {lang: {} for lang in supported_langs}
 
     for sign_ru in ZODIAC_SIGNS["ru"]:
-        emoji = ZODIAC_EMOJIS.get(sign_ru, "✨")
+        thematic_emoji = ZODIAC_THEMATIC_EMOJIS.get(sign_ru, "✨")
 
         # Prepare variants for each language
         variants = {lang: [] for lang in supported_langs}
@@ -215,18 +214,25 @@ def generate_multilingual_horoscopes():
         for _ in range(30):  # 30 variants for each sign
             template = random.choice(templates)
             theme = random.choice(themes)
-            action = random.choice(actions)
+            action_data = random.choice(actions)
             asset_key = random.choice(list(assets.keys()))
 
             for lang in supported_langs:
                 sign_lang = ZODIAC_CALLBACK_MAP.get(lang, {}).get(sign_ru, sign_ru)
 
+                # Select the correct asset form for Russian
+                asset_text = assets[asset_key][lang]
+                if lang == 'ru':
+                    case = action_data.get('case', 'nominative')
+                    asset_text = assets[asset_key]['ru'].get(case, assets[asset_key]['ru']['nominative'])
+
                 text_lang = template[lang].format(
                     theme=theme[lang],
-                    action=action[lang],
-                    asset=assets[asset_key][lang]
+                    action=action_data[lang],
+                    asset=asset_text
                 )
-                full_text = f"{emoji} *{sign_lang}:*\n\n{text_lang}"
+                # The body of the horoscope now contains the thematic emoji
+                full_text = f"{thematic_emoji} *{sign_lang}:*\n\n{text_lang}"
                 variants[lang].append(full_text)
 
         # Assign all generated variants to the database
@@ -942,23 +948,16 @@ def format_daily_summary(lang: str) -> str:
     # Ensure each sign gets a unique horoscope for the day
     horoscope_indices = {sign: random.randint(0, 29) for sign in zodiac_signs_ru}
 
-    # Create a reverse map from RU to the target language
+    # Create a map from Russian sign names to the localized names
     ru_to_lang_map = ZODIAC_CALLBACK_MAP.get(lang, {})
 
     for sign_ru in zodiac_signs_ru:
-        # Use the Russian sign name for internal logic (getting emoji, index)
-        # Use the translated sign name for display and DB lookup
         sign_lang = ru_to_lang_map.get(sign_ru, sign_ru)
-        emoji = ZODIAC_EMOJIS.get(sign_ru, "✨")
 
+        # Get a random, unique horoscope for the day's broadcast
         horoscope_index = horoscope_indices[sign_ru]
-        full_horoscope_text = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
-
-        # The generated text already contains the emoji and sign name.
-        # We just need to re-format it to ensure consistency if needed, but it's generated correctly.
-        # Let's reconstruct it to be safe, especially since we removed the random emoji from generation.
-        horoscope_main_text = full_horoscope_text.split("\n\n", 1)[1]
-        horoscopes[sign_lang] = f"{emoji} *{sign_lang}:*\n\n{horoscope_main_text}"
+        horoscope_text = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
+        horoscopes[sign_lang] = horoscope_text
 
 
     # Format the horoscope section
