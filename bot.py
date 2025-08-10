@@ -12,7 +12,7 @@ from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, SuccessfulPayment
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, ChatMemberHandler, filters, PreCheckoutQueryHandler, MessageHandler
 from telegram.error import TelegramError, BadRequest, Conflict
-from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP
+from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP, ZODIAC_EMOJIS
 
 # --- Helper Functions ---
 
@@ -98,6 +98,33 @@ def save_cache_to_file():
     except Exception as e:
         logger.error(f"Ошибка сохранения кэша: {e}")
 
+def save_user_data_to_file():
+    """Saves user data to a file, handling date objects."""
+    try:
+        # Create a deep copy to avoid modifying the original data
+        data_to_save = json.loads(json.dumps(user_data, default=str))
+
+        with open("user_data.json", "w") as f:
+            json.dump(data_to_save, f, indent=4)
+        logger.info("💾 User data saved to file")
+    except Exception as e:
+        logger.error(f"Error saving user data: {e}")
+
+def load_user_data_from_file():
+    """Loads user data from a file."""
+    global user_data
+    try:
+        with open("user_data.json", "r") as f:
+            user_data = json.load(f)
+            # Convert integer keys back from string
+            user_data = {int(k): v for k, v in user_data.items()}
+            logger.info("📂 User data loaded from file")
+    except FileNotFoundError:
+        logger.info("📂 User data file not found, starting with empty data")
+    except Exception as e:
+        logger.error(f"Error loading user data: {e}")
+
+
 def load_cache_from_file():
     """Загрузка кэша из файла"""
     try:
@@ -125,89 +152,91 @@ FALLBACK_DATA = {
     "ton": {"price": 7.50, "change": 2.5, "source": "fallback"}
 }
 
-def generate_bilingual_horoscopes():
-    """Generates a database of structured and grammatically correct horoscopes."""
+def generate_multilingual_horoscopes():
+    """Generates a database of structured and grammatically correct horoscopes for all supported languages."""
+    supported_langs = ["ru", "en", "zh"]
     templates = [
         {
             "ru": "Сегодня звезды благоволят вашим начинаниям в {theme}. Рекомендуется {action} {asset}. День обещает быть удачным, доверяйте своей интуиции!",
-            "en": "Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!"
+            "en": "Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!",
+            "zh": "[zh] Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!"
         },
         {
             "ru": "Будьте осторожны с {theme} сегодня. Звезды советуют {action} {asset}. Внимательность к деталям поможет избежать потерь.",
-            "en": "Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses."
+            "en": "Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses.",
+            "zh": "[zh] Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses."
         },
         {
-            "ru": "Отличное время для изучения {theme}. Рассмотрите возможность {action} {asset}. Удача на вашей стороне, но не забывайте проверять информацию.",
-            "en": "A great time to study {theme}. Consider the possibility of {action} {asset}. Luck is on your side, but don't forget to verify information."
+            "ru": "Движение BTC создает фон для TON. Отличное время для изучения {theme}. Рассмотрите возможность {action} {asset}.",
+            "en": "BTC's movement is setting the stage for TON. A great time to study {theme}. Consider the possibility of {action} {asset}.",
+            "zh": "[zh] BTC's movement is setting the stage for TON. A great time to study {theme}. Consider the possibility of {action} {asset}."
         },
         {
-            "ru": "Ваша энергия сегодня на пике, что идеально для {theme}. Звезды предлагают {action} {asset}. Смелые решения могут принести неожиданную прибыль.",
-            "en": "Your energy is at its peak today, which is perfect for {theme}. The stars suggest to {action} {asset}. Bold decisions can bring unexpected profits."
-        },
-        {
-            "ru": "Сегодняшний день подходит для анализа и планирования в сфере {theme}. Не спешите {action} {asset}, лучше подготовьтесь к будущим возможностям.",
-            "en": "Today is a good day for analysis and planning in {theme}. Don't rush to {action} {asset}; it's better to prepare for future opportunities."
+            "ru": "Экосистема TON сегодня в центре внимания. Ваша энергия на пике, что идеально для {theme}. Звезды предлагают {action} {asset}.",
+            "en": "The TON ecosystem is in the spotlight today. Your energy is at its peak, which is perfect for {theme}. The stars suggest to {action} {asset}.",
+            "zh": "[zh] The TON ecosystem is in the spotlight today. Your energy is at its peak, which is perfect for {theme}. The stars suggest to {action} {asset}."
         }
     ]
     themes = [
-        {"ru": "DeFi", "en": "DeFi"}, {"ru": "NFT-сектора", "en": "the NFT sector"},
-        {"ru": "долгосрочных инвестиций", "en": "long-term investments"}, {"ru": "дейтрейдинга", "en": "day trading"},
-        {"ru": "стейкинга", "en": "staking"}, {"ru": "поиска новых проектов", "en": "searching for new projects"}
+        {"ru": "DeFi в сети TON", "en": "DeFi on the TON network", "zh": "TON网络上的DeFi"},
+        {"ru": "рынка Jetton'ов", "en": "the Jetton market", "zh": "Jetton市场"},
+        {"ru": "NFT на Getgems/Fragment", "en": "NFTs on Getgems/Fragment", "zh": "Getgems/Fragment上的NFT"},
+        {"ru": "долгосрочных инвестиций в TON", "en": "long-term investments in TON", "zh": "TON的长期投资"},
+        {"ru": "стейкинга TON", "en": "staking TON", "zh": "质押TON"},
+        {"ru": "корреляции TON и BTC", "en": "the correlation between TON and BTC", "zh": "TON与BTC的相关性"}
     ]
     actions = [
-        {"ru": "присмотреться к", "en": "take a closer look at"}, {"ru": "избегать рискованных операций с", "en": "avoid risky operations with"},
-        {"ru": "увеличить позиции в", "en": "increase positions in"}, {"ru": "зафиксировать прибыль от", "en": "take profits from"},
-        {"ru": "провести исследование по", "en": "conduct research on"}
+        {"ru": "присмотреться к", "en": "take a closer look at", "zh": "仔细研究"},
+        {"ru": "искать новые возможности в", "en": "look for new opportunities in", "zh": "寻找新机会"},
+        {"ru": "увеличить позиции в", "en": "increase positions in", "zh": "增加仓位"},
+        {"ru": "зафиксировать прибыль от", "en": "take profits from", "zh": "获利了结"},
+        {"ru": "провести исследование по", "en": "conduct research on", "zh": "进行研究"},
+        {"ru": "пересмотреть свой портфель в", "en": "review your portfolio in", "zh": "审查您的投资组合"}
     ]
-    assets = [
-        "BTC", "TON", "ETH", "SOL", "альткоинами", "мем-коинами", "инфраструктурными токенами", "L2-решениями"
-    ]
-    assets_en = [
-        "BTC", "TON", "ETH", "SOL", "altcoins", "memecoins", "infrastructure tokens", "L2 solutions"
-    ]
+    assets = {
+        "BTC": {"ru": "BTC", "en": "BTC", "zh": "BTC"},
+        "TON": {"ru": "TON", "en": "TON", "zh": "TON"},
+        "ETH": {"ru": "ETH", "en": "ETH", "zh": "ETH"},
+        "SOL": {"ru": "SOL", "en": "SOL", "zh": "SOL"},
+        "альткоинами": {"ru": "альткоинами", "en": "altcoins", "zh": "山寨币"},
+        "мем-коинами": {"ru": "мем-коинами", "en": "memecoins", "zh": "模因币"},
+        "инфраструктурными токенами": {"ru": "инфраструктурными токенами", "en": "infrastructure tokens", "zh": "基础设施代币"},
+        "L2-решениями": {"ru": "L2-решениями", "en": "L2 solutions", "zh": "L2解决方案"}
+    }
 
-    horoscopes = {"ru": {}, "en": {}}
-    zodiac_pairs = zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"])
-    emojis = ["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡️", "🎯", "🤖", "🌔"]
-    random.shuffle(emojis)
+    horoscopes = {lang: {} for lang in supported_langs}
 
-    asset_map = dict(zip(assets, assets_en))
+    for sign_ru in ZODIAC_SIGNS["ru"]:
+        emoji = ZODIAC_EMOJIS.get(sign_ru, "✨")
 
-    for i, (sign_ru, sign_en) in enumerate(zodiac_pairs):
-        variants_ru, variants_en = [], []
+        # Prepare variants for each language
+        variants = {lang: [] for lang in supported_langs}
+
         for _ in range(30):  # 30 variants for each sign
             template = random.choice(templates)
             theme = random.choice(themes)
             action = random.choice(actions)
-            asset_ru = random.choice(assets)
-            asset_en = asset_map[asset_ru]
-            emoji = emojis[i % len(emojis)]
+            asset_key = random.choice(list(assets.keys()))
 
-            # Format Russian text
-            text_ru = template["ru"].format(
-                theme=theme["ru"],
-                action=action["ru"],
-                asset=asset_ru
-            )
-            full_text_ru = f"{emoji} *{sign_ru}:*\n\n{text_ru}"
+            for lang in supported_langs:
+                sign_lang = ZODIAC_CALLBACK_MAP.get(lang, {}).get(sign_ru, sign_ru)
 
-            # Format English text
-            text_en = template["en"].format(
-                theme=theme["en"],
-                action=action["en"],
-                asset=asset_en
-            )
-            full_text_en = f"{emoji} *{sign_en}:*\n\n{text_en}"
+                text_lang = template[lang].format(
+                    theme=theme[lang],
+                    action=action[lang],
+                    asset=assets[asset_key][lang]
+                )
+                full_text = f"{emoji} *{sign_lang}:*\n\n{text_lang}"
+                variants[lang].append(full_text)
 
-            variants_ru.append(full_text_ru)
-            variants_en.append(full_text_en)
-
-        horoscopes["ru"][sign_ru] = variants_ru
-        horoscopes["en"][sign_en] = variants_en
+        # Assign all generated variants to the database
+        for lang in supported_langs:
+            sign_lang = ZODIAC_CALLBACK_MAP.get(lang, {}).get(sign_ru, sign_ru)
+            horoscopes[lang][sign_lang] = variants[lang]
 
     return horoscopes
 
-HOROSCOPES_DB = generate_bilingual_horoscopes()
+HOROSCOPES_DB = generate_multilingual_horoscopes()
 
 def get_user_data(chat_id: int) -> dict:
     """Gets or creates a user's data entry."""
@@ -233,11 +262,13 @@ def update_user_horoscope(chat_id: int):
     It stores indices to ensure content is consistent across language changes.
     """
     user_info = get_user_data(chat_id)
-    today = date.today()
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    today_moscow = datetime.now(moscow_tz).date()
 
-    if user_info.get("last_update") != today:
-        logger.info(f"Updating daily content for user {chat_id}")
-        user_info["last_update"] = today
+    # The value from user_data could be a date object (from previous runs) or None
+    if user_info.get("last_update") != today_moscow:
+        logger.info(f"Updating daily content for user {chat_id} for date {today_moscow}")
+        user_info["last_update"] = today_moscow
 
         # Select a random index for the learning tip
         num_tips = len(TEXTS["learning_tips"]["ru"])  # Both languages have the same number of tips
@@ -250,7 +281,7 @@ def update_user_horoscope(chat_id: int):
             horoscope_indices[sign_ru] = random.randint(0, num_variants - 1)
         user_info["horoscope_indices"] = horoscope_indices
 
-        logger.info(f"Content indices updated for user {chat_id} for {today}")
+        logger.info(f"Content indices updated for user {chat_id} for {today_moscow}")
 
 def update_crypto_prices():
     """Обновляет курсы криптовалют, ротируя источники для надежности."""
@@ -534,6 +565,7 @@ def language_keyboard():
         [
             InlineKeyboardButton("🇷🇺 Русский", callback_data="set_lang_ru"),
             InlineKeyboardButton("🇬🇧 English", callback_data="set_lang_en"),
+            InlineKeyboardButton("🇨🇳 中文", callback_data="set_lang_zh"),
         ]
     ])
 
@@ -666,7 +698,10 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n{get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
 
     # Get the translated zodiac sign name for display
-    display_zodiac = zodiac if lang == "ru" else ZODIAC_CALLBACK_MAP.get(zodiac, zodiac)
+    display_zodiac = zodiac
+    if lang != "ru":
+        display_zodiac = ZODIAC_CALLBACK_MAP.get(lang, {}).get(zodiac, zodiac)
+
 
     # Get the horoscope text using the stored index for the user
     user_info = get_user_data(chat_id)
@@ -678,8 +713,9 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
         horoscope_text = get_text('horoscope_unavailable', lang)
 
     disclaimer_text = get_text("horoscope_disclaimer", lang)
+    emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
     text = (
-        f"*{display_zodiac} | {current_date}*\n\n"
+        f"*{emoji} {display_zodiac} | {current_date}*\n\n"
         f"{horoscope_text}\n"
         f"━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"{market_text}"
@@ -824,17 +860,19 @@ async def handle_feedback_response(update: Update, context: ContextTypes.DEFAULT
 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
+    feedback_type = query.data.split('_', 1)[1] # e.g., "accurate", "inaccurate", "profit"
 
-    thank_you_text = get_text("feedback_thank_you", lang)
+    response_text_key = f"feedback_response_{feedback_type}"
+    response_text = get_text(response_text_key, lang)
 
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=thank_you_text,
+            text=response_text,
             reply_markup=feedback_close_keyboard(lang)
         )
-        logger.info(f"Handled feedback from {chat_id}")
+        logger.info(f"Handled '{feedback_type}' feedback from {chat_id}")
     except BadRequest as e:
         logger.error(f"Error handling feedback response: {e}")
 
@@ -898,29 +936,30 @@ def format_daily_summary(lang: str) -> str:
     """Formats the full daily summary message in the specified language."""
     # Generate a fresh set of unique horoscopes for the broadcast
     horoscopes = {}
-    emojis = ["🚀", "💎", "🔮", "🌟", "✨", "🌕", "🔥", "💡", "⚡️", "🎯", "🤖", "🌔"]
-    random.shuffle(emojis)
-
-    # Get all zodiac signs for the specified language
-    zodiac_signs = ZODIAC_SIGNS[lang]
+    zodiac_signs_lang = ZODIAC_SIGNS[lang]
+    zodiac_signs_ru = ZODIAC_SIGNS["ru"]
 
     # Ensure each sign gets a unique horoscope for the day
-    horoscope_indices = {sign: random.randint(0, 29) for sign in ZODIAC_SIGNS["ru"]}
+    horoscope_indices = {sign: random.randint(0, 29) for sign in zodiac_signs_ru}
 
-    for i, sign_name in enumerate(zodiac_signs):
-        # Find the original Russian sign name to access the database
-        original_sign = list(ZODIAC_CALLBACK_MAP.keys())[list(ZODIAC_CALLBACK_MAP.values()).index(sign_name)] if lang == "en" else sign_name
+    # Create a reverse map from RU to the target language
+    ru_to_lang_map = ZODIAC_CALLBACK_MAP.get(lang, {})
 
-        # Get the horoscope text
-        horoscope_index = horoscope_indices[original_sign]
-        full_horoscope_text = HOROSCOPES_DB[lang][sign_name][horoscope_index]
+    for sign_ru in zodiac_signs_ru:
+        # Use the Russian sign name for internal logic (getting emoji, index)
+        # Use the translated sign name for display and DB lookup
+        sign_lang = ru_to_lang_map.get(sign_ru, sign_ru)
+        emoji = ZODIAC_EMOJIS.get(sign_ru, "✨")
 
-        # Extract the main text part, removing the default emoji and sign name
+        horoscope_index = horoscope_indices[sign_ru]
+        full_horoscope_text = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
+
+        # The generated text already contains the emoji and sign name.
+        # We just need to re-format it to ensure consistency if needed, but it's generated correctly.
+        # Let's reconstruct it to be safe, especially since we removed the random emoji from generation.
         horoscope_main_text = full_horoscope_text.split("\n\n", 1)[1]
+        horoscopes[sign_lang] = f"{emoji} *{sign_lang}:*\n\n{horoscope_main_text}"
 
-        # Assign a new unique emoji
-        emoji = emojis[i % len(emojis)]
-        horoscopes[sign_name] = f"{emoji} *{sign_name}:*\n\n{horoscope_main_text}"
 
     # Format the horoscope section
     current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
@@ -1036,9 +1075,10 @@ async def support_with_stars(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
 
     chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
     payload = "astrokit-support-stars-15"
-    title = "Поддержка AstroKit"
-    description = "Ваш вклад помогает нам делать прогнозы точнее!"
+    title = get_text("stars_invoice_title", lang)
+    description = get_text("stars_invoice_description", lang)
     prices = [LabeledPrice("15 ⭐️", 15)]
 
     try:
@@ -1057,8 +1097,10 @@ async def support_with_stars(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Answers the pre-checkout query."""
     query = update.pre_checkout_query
+    lang = get_user_lang(query.from_user.id)
     if query.invoice_payload != "astrokit-support-stars-15":
-        await query.answer(ok=False, error_message="Что-то пошло не так...")
+        error_message = get_text("stars_precheckout_error", lang)
+        await query.answer(ok=False, error_message=error_message)
     else:
         await query.answer(ok=True)
 
@@ -1166,9 +1208,11 @@ def main() -> None:
 
     logger.info("🚀 Запуск AstroKit Bot...")
     
-    # Загружаем кэш при запуске
+    # Загружаем кэш и данные пользователей при запуске
     logger.info("📂 Загрузка кэша...")
     cache_loaded = load_cache_from_file()
+    logger.info("📂 Загрузка данных пользователей...")
+    load_user_data_from_file()
     
     # Инициализация курсов криптовалют
     logger.info("📊 Инициализация курсов криптовалют...")
@@ -1237,6 +1281,14 @@ def main() -> None:
             name="cache_save"
         )
         logger.info("💾 Автосохранение кэша запланировано каждые 10 минут")
+
+        # Периодическое сохранение данных пользователей каждые 3 минуты
+        application.job_queue.run_repeating(
+            lambda context: save_user_data_to_file(),
+            interval=180,
+            name="user_data_save"
+        )
+        logger.info("💾 Автосохранение данных пользователей запланировано каждые 3 минуты")
 
 
     logger.info("🤖 Бот запущен! Ожидание сообщений...")
