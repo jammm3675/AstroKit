@@ -162,16 +162,26 @@ def generate_multilingual_horoscopes():
             "zh": "BTC的走势正在为TON铺平道路。现在是研究{theme}的大好时机。考虑{action}{asset}的可能性。"
         },
         {
-            "ru": "Экосистема TON сегодня в центре внимания. Ваша энергия на пике, что идеально для {theme}. Звезды предлагают {action} {asset}.",
-            "en": "The TON ecosystem is in the spotlight today. Your energy is at its peak, which is perfect for {theme}. The stars suggest to {action} {asset}.",
-            "zh": "TON生态系统今天备受关注。您的精力充沛，非常适合{theme}。星象建议{action}{asset}。"
+            "ru": "Экосистема TON сегодня в центре внимания. Ваша энергия на пике, что идеально для {theme}. Звезды также предлагают {action} {asset}.",
+            "en": "The TON ecosystem is in the spotlight today. Your energy is at its peak, which is perfect for {theme}. The stars also suggest to {action} {asset}.",
+            "zh": "TON生态系统今天备受关注。您的精力充沛，非常适合{theme}。星象也建议{action}{asset}。"
+        },
+        {
+            "ru": "Сеть TON гудит от активности. Это может быть хороший день, чтобы {action} {asset} и следить за новостями.",
+            "en": "The TON network is buzzing with activity. This could be a good day to {action} {asset} and watch the news.",
+            "zh": "TON网络活动频繁。今天可能是{action}{asset}并关注新闻的好日子。"
+        },
+        {
+            "ru": "Ваша интуиция по поводу {theme} может привести к успеху. Звезды намекают на необходимость {action} {asset}.",
+            "en": "Your intuition about {theme} could lead to success. The stars hint at the need to {action} {asset}.",
+            "zh": "您对{theme}的直觉可能会带来成功。星象暗示需要{action}{asset}。"
         }
     ]
     themes = [
         {"ru": "DeFi в сети TON", "en": "DeFi on the TON network", "zh": "TON网络上的DeFi"},
         {"ru": "рынка Jetton'ов", "en": "the Jetton market", "zh": "Jetton市场"},
         {"ru": "NFT на Getgems/Fragment", "en": "NFTs on Getgems/Fragment", "zh": "Getgems/Fragment上的NFT"},
-        {"ru": "долгосрочных инвестиций в TON", "en": "long-term investments in TON", "zh": "TON的长期投资"},
+        {"ru": "P2E-игр на TON", "en": "P2E games on TON", "zh": "TON上的P2E游戏"},
         {"ru": "стейкинга TON", "en": "staking TON", "zh": "质押TON"},
         {"ru": "корреляции TON и BTC", "en": "the correlation between TON and BTC", "zh": "TON与BTC的相关性"}
     ]
@@ -180,17 +190,18 @@ def generate_multilingual_horoscopes():
         {"ru": "искать новые возможности в", "en": "look for new opportunities in", "zh": "寻找新机会", "case": "prepositional"},
         {"ru": "увеличить позиции в", "en": "increase positions in", "zh": "增加仓位", "case": "prepositional"},
         {"ru": "зафиксировать прибыль от", "en": "take profits from", "zh": "获利了结", "case": "genitive"},
-        {"ru": "провести исследование по", "en": "conduct research on", "zh": "进行研究", "case": "dative"}
+        {"ru": "провести исследование по", "en": "conduct research on", "zh": "进行研究", "case": "dative"},
+        {"ru": "следить за", "en": "keep an eye on", "zh": "关注", "case": "instrumental"}
     ]
     assets = {
-        "BTC": {"en": "BTC", "zh": "BTC", "ru": {"nominative": "BTC", "dative": "BTC", "prepositional": "BTC", "genitive": "BTC"}},
-        "TON": {"en": "TON", "zh": "TON", "ru": {"nominative": "TON", "dative": "TON", "prepositional": "TON", "genitive": "TON"}},
-        "ETH": {"en": "ETH", "zh": "ETH", "ru": {"nominative": "ETH", "dative": "ETH", "prepositional": "ETH", "genitive": "ETH"}},
-        "SOL": {"en": "SOL", "zh": "SOL", "ru": {"nominative": "SOL", "dative": "SOL", "prepositional": "SOL", "genitive": "SOL"}},
-        "altcoins": {"en": "altcoins", "zh": "山寨币", "ru": {"nominative": "альткоины", "dative": "альткоинам", "prepositional": "альткоинах", "genitive": "альткоинов"}},
-        "memecoins": {"en": "memecoins", "zh": "模因币", "ru": {"nominative": "мем-коины", "dative": "мем-коинам", "prepositional": "мем-коинах", "genitive": "мем-коинов"}},
-        "infrastructure_tokens": {"en": "infrastructure tokens", "zh": "基础设施代币", "ru": {"nominative": "инфраструктурные токены", "dative": "инфраструктурным токенам", "prepositional": "инфраструктурных токенах", "genitive": "инфраструктурных токенов"}},
-        "l2_solutions": {"en": "L2 solutions", "zh": "L2解决方案", "ru": {"nominative": "L2-решения", "dative": "L2-решениям", "prepositional": "L2-решениях", "genitive": "L2-решений"}}
+        "BTC": {"en": "BTC", "zh": "BTC", "ru": {"nominative": "BTC", "dative": "BTC", "prepositional": "BTC", "genitive": "BTC", "instrumental": "BTC"}},
+        "TON": {"en": "TON", "zh": "TON", "ru": {"nominative": "TON", "dative": "TON", "prepositional": "TON", "genitive": "TON", "instrumental": "TON"}},
+        "ETH": {"en": "ETH", "zh": "ETH", "ru": {"nominative": "ETH", "dative": "ETH", "prepositional": "ETH", "genitive": "ETH", "instrumental": "ETH"}},
+        "SOL": {"en": "SOL", "zh": "SOL", "ru": {"nominative": "SOL", "dative": "SOL", "prepositional": "SOL", "genitive": "SOL", "instrumental": "SOL"}},
+        "altcoins": {"en": "altcoins", "zh": "山寨币", "ru": {"nominative": "альткоины", "dative": "альткоинам", "prepositional": "альткоинах", "genitive": "альткоинов", "instrumental": "альткоинами"}},
+        "memecoins": {"en": "memecoins", "zh": "模因币", "ru": {"nominative": "мем-коины", "dative": "мем-коинам", "prepositional": "мем-коинах", "genitive": "мем-коинов", "instrumental": "мем-коинами"}},
+        "infrastructure_tokens": {"en": "infrastructure tokens", "zh": "基础设施代币", "ru": {"nominative": "инфраструктурные токены", "dative": "инфраструктурным токенам", "prepositional": "инфраструктурных токенах", "genitive": "инфраструктурных токенов", "instrumental": "инфраструктурными токенами"}},
+        "l2_solutions": {"en": "L2 solutions", "zh": "L2解决方案", "ru": {"nominative": "L2-решения", "dative": "L2-решениям", "prepositional": "L2-решениях", "genitive": "L2-решений", "instrumental": "L2-решениями"}}
     }
 
     horoscopes = {lang: {} for lang in supported_langs}
