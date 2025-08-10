@@ -157,9 +157,9 @@ def generate_multilingual_horoscopes():
     supported_langs = ["ru", "en", "zh"]
     templates = [
         {
-            "ru": "Движение BTC создает фон для TON. Отличное время для изучения {theme}. Рассмотрите возможность {action} {asset}.",
-            "en": "BTC's movement is setting the stage for TON. A great time to study {theme}. Consider the possibility of {action} {asset}.",
-            "zh": "BTC的走势正在为TON铺平道路。现在是研究{theme}的大好时机。考虑{action}{asset}的可能性。"
+            "ru": "Движение BTC создает фон для TON. Отличное время для изучения {theme}, звезды рекомендуют {action} {asset}.",
+            "en": "BTC's movement is setting the stage for TON. A great time to study {theme}, the stars recommend to {action} {asset}.",
+            "zh": "BTC的走势正在为TON铺平道路。现在是研究{theme}的大好时机，星象建议{action}{asset}。"
         },
         {
             "ru": "Экосистема TON сегодня в центре внимания. Ваша энергия на пике, что идеально для {theme}. Звезды также предлагают {action} {asset}.",
@@ -172,9 +172,9 @@ def generate_multilingual_horoscopes():
             "zh": "TON网络活动频繁。今天可能是{action}{asset}并关注新闻的好日子。"
         },
         {
-            "ru": "Ваша интуиция по поводу {theme} может привести к успеху. Звезды намекают на необходимость {action} {asset}.",
-            "en": "Your intuition about {theme} could lead to success. The stars hint at the need to {action} {asset}.",
-            "zh": "您对{theme}的直觉可能会带来成功。星象暗示需要{action}{asset}。"
+            "ru": "Ваша интуиция по поводу {theme} может привести к успеху. Сегодня хороший день, чтобы {action} {asset}.",
+            "en": "Your intuition about {theme} could lead to success. Today is a good day to {action} {asset}.",
+            "zh": "您对{theme}的直觉可能会带来成功。今天是{action}{asset}的好日子。"
         }
     ]
     themes = [
