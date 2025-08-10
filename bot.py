@@ -157,16 +157,6 @@ def generate_multilingual_horoscopes():
     supported_langs = ["ru", "en", "zh"]
     templates = [
         {
-            "ru": "Сегодня звезды благоволят вашим начинаниям в {theme}. Рекомендуется {action} {asset}. День обещает быть удачным, доверяйте своей интуиции!",
-            "en": "Today, the stars favor your endeavors in {theme}. It is recommended to {action} {asset}. The day promises to be successful, trust your intuition!",
-            "zh": "今天，星象有利于您在{theme}的努力。建议{action}{asset}。今天注定会成功，相信您的直觉！"
-        },
-        {
-            "ru": "Будьте осторожны с {theme} сегодня. Звезды советуют {action} {asset}. Внимательность к деталям поможет избежать потерь.",
-            "en": "Be careful with {theme} today. The stars advise to {action} {asset}. Attention to detail will help avoid losses.",
-            "zh": "今天在{theme}方面要小心。星象建议{action}{asset}。注意细节将有助于避免损失。"
-        },
-        {
             "ru": "Движение BTC создает фон для TON. Отличное время для изучения {theme}. Рассмотрите возможность {action} {asset}.",
             "en": "BTC's movement is setting the stage for TON. A great time to study {theme}. Consider the possibility of {action} {asset}.",
             "zh": "BTC的走势正在为TON铺平道路。现在是研究{theme}的大好时机。考虑{action}{asset}的可能性。"
@@ -801,7 +791,11 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    lang_prompt = f"🇷🇺 {get_text('language_select', 'ru')} / 🇬🇧 {get_text('language_select', 'en')}"
+    lang_prompt = (
+        f"🇷🇺 {get_text('language_select', 'ru')} / "
+        f"🇬🇧 {get_text('language_select', 'en')} / "
+        f"🇨🇳 {get_text('language_select', 'zh')}"
+    )
     await context.bot.edit_message_text(
         chat_id=query.message.chat_id,
         message_id=query.message.message_id,
