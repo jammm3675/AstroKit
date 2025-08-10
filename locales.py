@@ -160,7 +160,7 @@ TEXTS = {
     "premium_menu_description": {
         "ru": "Если вам нравится AstroKit, вы можете поддержать автора, отправив немного TON или используя Telegram Stars. Ваша поддержка помогает развивать проект! 🙏",
         "en": "If you enjoy AstroKit, you can support the author by sending some TON or using Telegram Stars. Your support helps the project grow! 🙏",
-        "zh": "如果您喜欢AstroKit，可以通过发送一些TON或使用Telegram Stars来支持作者。您的支持有助于项目成长！🙏"
+        "zh": "如果您喜欢 AstroKit，可以通过发送一些 TON 或使用 Telegram Stars 来支持作者。您的支持有助于项目成长！🙏"
     },
     "premium_button_ton": {
         "ru": "Отправить 0.1 TON",
