@@ -129,21 +129,21 @@ TEXTS = {
         "zh": "⚙️ *设置*"
     },
     "notifications_status_line": {
-        "ru": "🔔 Ежедневный гороскоп: {status}",
-        "en": "🔔 Daily horoscope: {status}",
-        "zh": "🔔 每日星座运势: {status}"
+        "ru": "🔔 Ежедневные уведомления: {status}",
+        "en": "🔔 Daily notifications: {status}",
+        "zh": "🔔 每日通知: {status}"
     },
-    "notifications_on": {"ru": "включен ✅", "en": "enabled ✅", "zh": "已启用 ✅"},
-    "notifications_off": {"ru": "выключен ❌", "en": "disabled ❌", "zh": "已禁用 ❌"},
+    "notifications_on": {"ru": "включены ✅", "en": "enabled ✅", "zh": "已启用 ✅"},
+    "notifications_off": {"ru": "выключены ❌", "en": "disabled ❌", "zh": "已禁用 ❌"},
     "toggle_notifications_on_button": {
-        "ru": "🔔 Включить гороскоп",
-        "en": "🔔 Enable horoscope",
-        "zh": "🔔 启用星座运势"
+        "ru": "🔔 Включить уведомления",
+        "en": "🔔 Enable notifications",
+        "zh": "🔔 启用通知"
     },
     "toggle_notifications_off_button": {
-        "ru": "🔕 Выключить гороскоп",
-        "en": "🔕 Disable horoscope",
-        "zh": "🔕 禁用星座运势"
+        "ru": "🔕 Выключить уведомления",
+        "en": "🔕 Disable notifications",
+        "zh": "🔕 禁用通知"
     },
     "change_language_button": {
         "ru": "🌐 Сменить язык",
