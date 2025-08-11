@@ -208,7 +208,6 @@ def generate_multilingual_horoscopes():
         "BTC": {"en": "BTC", "zh": "BTC", "ru": {"nominative": "BTC", "dative": "BTC", "prepositional": "BTC", "genitive": "BTC", "instrumental": "BTC"}},
         "TON": {"en": "TON", "zh": "TON", "ru": {"nominative": "TON", "dative": "TON", "prepositional": "TON", "genitive": "TON", "instrumental": "TON"}},
         "ETH": {"en": "ETH", "zh": "ETH", "ru": {"nominative": "ETH", "dative": "ETH", "prepositional": "ETH", "genitive": "ETH", "instrumental": "ETH"}},
-        "SOL": {"en": "SOL", "zh": "SOL", "ru": {"nominative": "SOL", "dative": "SOL", "prepositional": "SOL", "genitive": "SOL", "instrumental": "SOL"}},
         "altcoins": {"en": "altcoins", "zh": "山寨币", "ru": {"nominative": "альткоины", "dative": "альткоинам", "prepositional": "альткоинах", "genitive": "альткоинов", "instrumental": "альткоинами"}},
         "memecoins": {"en": "memecoins", "zh": "模因币", "ru": {"nominative": "мем-коины", "dative": "мем-коинам", "prepositional": "мем-коинах", "genitive": "мем-коинов", "instrumental": "мем-коинами"}},
         "infrastructure_tokens": {"en": "infrastructure tokens", "zh": "基础设施代币", "ru": {"nominative": "инфраструктурные токены", "dative": "инфраструктурным токенам", "prepositional": "инфраструктурных токенах", "genitive": "инфраструктурных токенов", "instrumental": "инфраструктурными токенами"}},
