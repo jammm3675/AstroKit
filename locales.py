@@ -128,22 +128,22 @@ TEXTS = {
         "en": "⚙️ *Settings*",
         "zh": "⚙️ *设置*"
     },
-    "polls_status_line": {
-        "ru": "🔔 Ежедневные опросы: {status}",
-        "en": "🔔 Daily polls: {status}",
-        "zh": "🔔 每日民意调查: {status}"
+    "notifications_status_line": {
+        "ru": "🔔 Ежедневный гороскоп: {status}",
+        "en": "🔔 Daily horoscope: {status}",
+        "zh": "🔔 每日星座运势: {status}"
     },
-    "polls_on": {"ru": "включены ✅", "en": "enabled ✅", "zh": "已启用 ✅"},
-    "polls_off": {"ru": "выключены ❌", "en": "disabled ❌", "zh": "已禁用 ❌"},
-    "toggle_polls_on_button": {
-        "ru": "🔔 Включить опросы",
-        "en": "🔔 Enable polls",
-        "zh": "🔔 启用民意调查"
+    "notifications_on": {"ru": "включен ✅", "en": "enabled ✅", "zh": "已启用 ✅"},
+    "notifications_off": {"ru": "выключен ❌", "en": "disabled ❌", "zh": "已禁用 ❌"},
+    "toggle_notifications_on_button": {
+        "ru": "🔔 Включить гороскоп",
+        "en": "🔔 Enable horoscope",
+        "zh": "🔔 启用星座运势"
     },
-    "toggle_polls_off_button": {
-        "ru": "🔕 Выключить опросы",
-        "en": "🔕 Disable polls",
-        "zh": "🔕 禁用民意调查"
+    "toggle_notifications_off_button": {
+        "ru": "🔕 Выключить гороскоп",
+        "en": "🔕 Disable horoscope",
+        "zh": "🔕 禁用星座运势"
     },
     "change_language_button": {
         "ru": "🌐 Сменить язык",
@@ -240,55 +240,14 @@ TEXTS = {
         ]
     },
 
-    # --- Feedback Notification ---
-    "feedback_question": {
-        "ru": "Как вы оцените сегодняшний прогноз?",
-        "en": "How would you rate today's forecast?",
-        "zh": "您如何评价今天的预测？"
-    },
-    "feedback_option_accurate": {
-        "ru": "👍 Точный",
-        "en": "👍 Accurate",
-        "zh": "👍 准确"
-    },
-    "feedback_option_inaccurate": {
-        "ru": "👎 Не совпал",
-        "en": "👎 Didn't match",
-        "zh": "👎 不匹配"
-    },
-    "feedback_option_profit": {
-        "ru": "💰 Принес прибыль",
-        "en": "💰 Brought profit",
-        "zh": "💰 带来了利润"
-    },
-    "feedback_thank_you": {
-        "ru": "Спасибо за то, что делаете наши прогнозы более точными! ✨",
-        "en": "Thank you for making our forecasts more accurate! ✨",
-        "zh": "感谢您使我们的预测更加准确！✨"
-    },
-    "feedback_response_accurate": {
-        "ru": "Спасибо за высокую оценку! Мы рады, что наш прогноз оказался точным. ✨",
-        "en": "Thank you for the high rating! We are glad that our forecast was accurate. ✨",
-        "zh": "感谢您的高度评价！我们很高兴我们的预测是准确的。✨"
-    },
-    "feedback_response_inaccurate": {
-        "ru": "Сожалеем, что прогноз не оправдал ожиданий. Звезды бывают капризны, но мы учтем ваш отзыв для улучшения наших алгоритмов! 🙏",
-        "en": "We're sorry the forecast didn't meet your expectations. The stars can be capricious, but we will use your feedback to improve our algorithms! 🙏",
-        "zh": "很抱歉，预测未能达到您的期望。星星有时很任性，但我们会根据您的反馈来改进我们的算法！🙏"
-    },
-    "feedback_response_profit": {
-        "ru": "Отличные новости! Мы рады, что наш астрологический анализ помог вам получить прибыль. Поздравляем! 🎉",
-        "en": "Great news! We are glad that our astrological analysis helped you make a profit. Congratulations! 🎉",
-        "zh": "好消息！我们很高兴我们的占星分析帮助您获利。恭喜！🎉"
-    },
-    "feedback_close_button": {
-        "ru": "Закрыть уведомление",
-        "en": "Close notification",
-        "zh": "关闭通知"
-    },
     "astro_command_title": {
         "ru": "КРИПТОГОРОСКОП",
         "en": "CRYPTO-HOROSCOPE",
         "zh": "加密星座运势"
+    },
+    "daily_notification_title": {
+        "ru": "🔮 Ваш персональный гороскоп на сегодня!",
+        "en": "🔮 Your personal horoscope for today!",
+        "zh": "🔮 您今天的个人星座运势！"
     }
 }
