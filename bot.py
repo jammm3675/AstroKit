@@ -175,6 +175,11 @@ def generate_multilingual_horoscopes():
             "ru": "Ваша интуиция по поводу {theme} может привести к успеху. Сегодня хороший день, чтобы {action} {asset}.",
             "en": "Your intuition about {theme} could lead to success. Today is a good day to {action} {asset}.",
             "zh": "您对{theme}的直觉可能会带来成功。今天是{action}{asset}的好日子。"
+        },
+        {
+            "ru": "Анализ {theme} показывает, что сейчас важно {action} {asset}. Будьте внимательны к сигналам рынка.",
+            "en": "Analysis of {theme} shows that it is now important to {action} {asset}. Pay attention to market signals.",
+            "zh": "对{theme}的分析表明，现在{action}{asset}非常重要。请注意市场信号。"
         }
     ]
     themes = [
@@ -183,7 +188,10 @@ def generate_multilingual_horoscopes():
         {"ru": "NFT на Getgems/Fragment", "en": "NFTs on Getgems/Fragment", "zh": "Getgems/Fragment上的NFT"},
         {"ru": "P2E-игр на TON", "en": "P2E games on TON", "zh": "TON上的P2E游戏"},
         {"ru": "стейкинга TON", "en": "staking TON", "zh": "质押TON"},
-        {"ru": "корреляции TON и BTC", "en": "the correlation between TON and BTC", "zh": "TON与BTC的相关性"}
+        {"ru": "корреляции TON и BTC", "en": "the correlation between TON and BTC", "zh": "TON与BTC的相关性"},
+        {"ru": "рыночных настроений", "en": "market sentiment", "zh": "市场情绪"},
+        {"ru": "индекса страха и жадности", "en": "the Fear & Greed Index", "zh": "恐惧与贪婪指数"},
+        {"ru": "циклов FOMO и FUD", "en": "FOMO and FUD cycles", "zh": "FOMO与FUD周期"}
     ]
     actions = [
         {"ru": "присмотреться к", "en": "take a closer look at", "zh": "仔细研究", "case": "dative"},
@@ -191,7 +199,10 @@ def generate_multilingual_horoscopes():
         {"ru": "увеличить позиции в", "en": "increase positions in", "zh": "增加仓位", "case": "prepositional"},
         {"ru": "зафиксировать прибыль от", "en": "take profits from", "zh": "获利了结", "case": "genitive"},
         {"ru": "провести исследование по", "en": "conduct research on", "zh": "进行研究", "case": "dative"},
-        {"ru": "следить за", "en": "keep an eye on", "zh": "关注", "case": "instrumental"}
+        {"ru": "следить за", "en": "keep an eye on", "zh": "关注", "case": "instrumental"},
+        {"ru": "анализировать", "en": "to analyze", "zh": "分析", "case": "nominative"},
+        {"ru": "противостоять", "en": "to resist", "zh": "抵制", "case": "dative"},
+        {"ru": "избегать", "en": "to avoid", "zh": "避免", "case": "genitive"}
     ]
     assets = {
         "BTC": {"en": "BTC", "zh": "BTC", "ru": {"nominative": "BTC", "dative": "BTC", "prepositional": "BTC", "genitive": "BTC", "instrumental": "BTC"}},
@@ -250,15 +261,17 @@ def get_user_data(chat_id: int) -> dict:
     if chat_id not in user_data:
         user_data[chat_id] = {
             "language": None,
-            "polls_enabled": True,
+            "notifications_enabled": True,
             "last_update": None,
             "tip_index": None,
             "horoscope_indices": {},
             "is_new_user": True
         }
-    # Backward compatibility for users who have "notifications" key
+    # Backward compatibility for old keys
     if "notifications" in user_data[chat_id]:
-        user_data[chat_id]["polls_enabled"] = user_data[chat_id].pop("notifications")
+        user_data[chat_id]["notifications_enabled"] = user_data[chat_id].pop("notifications")
+    if "polls_enabled" in user_data[chat_id]:
+        user_data[chat_id]["notifications_enabled"] = user_data[chat_id].pop("polls_enabled")
 
     return user_data[chat_id]
 
@@ -554,13 +567,13 @@ def zodiac_keyboard(lang: str):
 def settings_keyboard(chat_id: int, lang: str):
     """Creates the settings keyboard in the specified language."""
     user_info = get_user_data(chat_id)
-    polls_on = user_info.get("polls_enabled", True)
+    notifications_on = user_info.get("notifications_enabled", True)
     
-    toggle_key = "toggle_polls_off_button" if polls_on else "toggle_polls_on_button"
+    toggle_key = "toggle_notifications_off_button" if notifications_on else "toggle_notifications_on_button"
     toggle_text = get_text(toggle_key, lang)
     
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(toggle_text, callback_data="toggle_polls")],
+        [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
@@ -778,12 +791,12 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     lang = get_user_lang(chat_id)
     
     user_info = get_user_data(chat_id)
-    polls_on = user_info.get("polls_enabled", True)
-    status_key = "polls_on" if polls_on else "polls_off"
+    notifications_on = user_info.get("notifications_enabled", True)
+    status_key = "notifications_on" if notifications_on else "notifications_off"
     
     text = (
         f"*{get_text('settings_title', lang)}*\n\n"
-        f"{get_text('polls_status_line', lang).format(status=get_text(status_key, lang))}"
+        f"{get_text('notifications_status_line', lang).format(status=get_text(status_key, lang))}"
     )
     
     try:
@@ -814,92 +827,22 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         reply_markup=language_keyboard()
     )
 
-async def toggle_polls(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Toggles user polls on or off."""
+async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Toggles user notifications on or off."""
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat_id
     
     user_info = get_user_data(chat_id)
-    new_status = not user_info.get("polls_enabled", True)
-    user_info["polls_enabled"] = new_status
+    new_status = not user_info.get("notifications_enabled", True)
+    user_info["notifications_enabled"] = new_status
     
     status_text = "enabled" if new_status else "disabled"
-    logger.info(f"Polls for user {chat_id} are now {status_text}")
+    logger.info(f"Notifications for user {chat_id} are now {status_text}")
     
     # Show updated settings menu
     await show_settings_menu(update, context)
 
-def feedback_keyboard(lang: str):
-    """Creates the feedback keyboard."""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(get_text("feedback_option_accurate", lang), callback_data="feedback_accurate"),
-            InlineKeyboardButton(get_text("feedback_option_inaccurate", lang), callback_data="feedback_inaccurate"),
-            InlineKeyboardButton(get_text("feedback_option_profit", lang), callback_data="feedback_profit"),
-        ]
-    ])
-
-def feedback_close_keyboard(lang: str):
-    """Creates the close button for the feedback response."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("feedback_close_button", lang), callback_data="feedback_close")]
-    ])
-
-async def send_daily_feedback_job(context: ContextTypes.DEFAULT_TYPE):
-    """Job to send a feedback request to all users with polls enabled."""
-    logger.info("Starting daily feedback job...")
-    for chat_id, data in user_data.items():
-        if data.get("polls_enabled"):
-            lang = data.get("language", "ru")
-            question = get_text("feedback_question", lang)
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=question,
-                    reply_markup=feedback_keyboard(lang)
-                )
-                logger.info(f"Sent daily feedback request to {chat_id}")
-            except Exception as e:
-                logger.error(f"Failed to send feedback request to {chat_id}: {e}")
-    logger.info("Daily feedback job finished.")
-
-async def handle_feedback_response(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles a user's response to the feedback request."""
-    query = update.callback_query
-    await query.answer()
-
-    chat_id = query.message.chat_id
-    lang = get_user_lang(chat_id)
-    feedback_type = query.data.split('_', 1)[1] # e.g., "accurate", "inaccurate", "profit"
-
-    response_text_key = f"feedback_response_{feedback_type}"
-    response_text = get_text(response_text_key, lang)
-
-    try:
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=query.message.message_id,
-            text=response_text,
-            reply_markup=feedback_close_keyboard(lang)
-        )
-        logger.info(f"Handled '{feedback_type}' feedback from {chat_id}")
-    except BadRequest as e:
-        logger.error(f"Error handling feedback response: {e}")
-
-async def handle_feedback_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Deletes the feedback message."""
-    query = update.callback_query
-    await query.answer()
-    
-    try:
-        await context.bot.delete_message(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id
-        )
-        logger.info(f"Closed feedback message for {query.message.chat_id}")
-    except BadRequest as e:
-        logger.error(f"Error closing feedback message: {e}")
 
 # --- Channel Broadcast Feature ---
 
@@ -1012,6 +955,65 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{tip_text}"
     await update.message.reply_text(text, parse_mode="Markdown")
+
+def format_single_horoscope_notification(lang: str) -> str:
+    """Formats a daily notification with a single random horoscope."""
+    # 1. Select a random zodiac sign
+    sign_ru = random.choice(ZODIAC_SIGNS["ru"])
+    sign_lang = ZODIAC_CALLBACK_MAP.get(lang, {}).get(sign_ru, sign_ru)
+
+    # 2. Get a random horoscope variant for that sign
+    horoscope_index = random.randint(0, len(HOROSCOPES_DB[lang][sign_lang]) - 1)
+    horoscope_text = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
+
+    # 3. Get market data
+    update_crypto_prices()
+    market_text = ""
+    for symbol in CRYPTO_IDS:
+        price_data = crypto_prices[symbol]
+        if price_data["price"] is not None and price_data["change"] is not None:
+            change_text, bar = format_change_bar(price_data["change"])
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text}\n{bar}\n"
+
+    # 4. Assemble the message
+    title = get_text('daily_notification_title', lang)
+    disclaimer_text = get_text("horoscope_disclaimer", lang)
+
+    return (
+        f"*{title}*\n\n"
+        f"{horoscope_text}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
+        f"*{get_text('market_rates_title', lang).strip()}*\n{market_text}\n"
+        f"{disclaimer_text}"
+    )
+
+async def send_daily_horoscope_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to send a daily horoscope to all users with notifications enabled."""
+    logger.info("Starting daily horoscope job for users...")
+
+    # Create a copy of user_data keys to avoid issues with modification during iteration
+    chat_ids = list(user_data.keys())
+
+    for chat_id in chat_ids:
+        user_info = get_user_data(chat_id)
+        if user_info.get("notifications_enabled"):
+            lang = user_info.get("language", "ru")
+
+            # Generate a unique message for each user
+            message_text = format_single_horoscope_notification(lang)
+
+            try:
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text=message_text,
+                    parse_mode="Markdown",
+                    reply_markup=back_to_menu_keyboard(lang)
+                )
+                logger.info(f"Sent daily horoscope to user {chat_id}")
+                # Add a small delay to avoid hitting rate limits
+                await asyncio.sleep(0.2)
+            except (BadRequest, TelegramError) as e:
+                logger.error(f"Failed to send daily horoscope to {chat_id}: {e}")
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     """Job to broadcast the daily summary to all subscribed channels."""
@@ -1143,8 +1145,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await show_learning_tip(update, context)
         elif data == "settings_menu":
             await show_settings_menu(update, context)
-        elif data == "toggle_polls":
-            await toggle_polls(update, context)
+        elif data == "toggle_notifications":
+            await toggle_notifications(update, context)
         elif data == "premium_menu":
             await show_premium_menu(update, context)
         elif data == "support_stars":
@@ -1153,11 +1155,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await set_language(update, context)
         elif data == "change_language":
             await change_language(update, context)
-        elif data.startswith("feedback_"):
-            if data == "feedback_close":
-                await handle_feedback_close(update, context)
-            else:
-                await handle_feedback_response(update, context)
 
     except Exception as e:
         logger.error(f"Error in button handler: {e}")
@@ -1260,10 +1257,10 @@ def main() -> None:
     if application.job_queue:
         moscow_tz = pytz.timezone("Europe/Moscow")
 
-        # Schedule daily feedback job
-        feedback_time = datetime.strptime("12:00", "%H:%M").time().replace(tzinfo=moscow_tz)
-        application.job_queue.run_daily(send_daily_feedback_job, time=feedback_time, name="daily_feedback_job")
-        logger.info("📅 Daily feedback job scheduled for 12:00 Moscow time.")
+        # Schedule daily horoscope job for users
+        horoscope_time = datetime.strptime("19:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        application.job_queue.run_daily(send_daily_horoscope_job, time=horoscope_time, name="daily_horoscope_job")
+        logger.info("📅 Daily horoscope job for users scheduled for 19:00 Moscow time.")
 
         # Schedule daily broadcast job
         broadcast_time = datetime.strptime("00:00", "%H:%M").time().replace(tzinfo=moscow_tz)
