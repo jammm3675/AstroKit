@@ -271,6 +271,8 @@ def get_user_data(chat_id: int) -> dict:
         user_data[chat_id]["notifications_enabled"] = user_data[chat_id].pop("notifications")
     if "polls_enabled" in user_data[chat_id]:
         user_data[chat_id]["notifications_enabled"] = user_data[chat_id].pop("polls_enabled")
+    if "votes" not in user_data[chat_id]:
+        user_data[chat_id]["votes"] = []
 
     return user_data[chat_id]
 
@@ -575,6 +577,24 @@ def settings_keyboard(chat_id: int, lang: str):
         [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
+    ])
+
+
+def poll_keyboard(lang: str):
+    """Creates the poll keyboard."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(get_text("poll_button_good", lang), callback_data="poll_good"),
+            InlineKeyboardButton(get_text("poll_button_bad", lang), callback_data="poll_bad"),
+            InlineKeyboardButton(get_text("poll_button_money", lang), callback_data="poll_money"),
+        ]
+    ])
+
+
+def poll_close_keyboard(lang: str):
+    """Creates the close button keyboard."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("poll_close_button", lang), callback_data="poll_close")]
     ])
 
 
@@ -975,7 +995,7 @@ def format_single_horoscope_notification(lang: str) -> str:
             market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text}\n{bar}\n"
 
     # 4. Assemble the message
-    title = get_text('daily_notification_title', lang)
+    title = get_text('daily_notification_title_poll', lang)
     disclaimer_text = get_text("horoscope_disclaimer", lang)
 
     return (
@@ -1006,7 +1026,7 @@ async def send_daily_horoscope_job(context: ContextTypes.DEFAULT_TYPE):
                     chat_id=chat_id,
                     text=message_text,
                     parse_mode="Markdown",
-                    reply_markup=back_to_menu_keyboard(lang)
+                    reply_markup=poll_keyboard(lang)
                 )
                 logger.info(f"Sent daily horoscope to user {chat_id}")
                 # Add a small delay to avoid hitting rate limits
@@ -1126,6 +1146,65 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         reply_markup=back_to_menu_keyboard(lang)
     )
 
+
+async def handle_poll_vote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles a vote from the accuracy poll."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = query.message.chat_id
+    vote = query.data
+    lang = get_user_lang(chat_id)
+
+    # 1. Save the vote
+    user_info = get_user_data(chat_id)
+
+    user_info["votes"].append({
+        "vote": vote,
+        "timestamp": datetime.now().isoformat(),
+        "message_id": query.message.message_id
+    })
+    logger.info(f"User {chat_id} voted: {vote}")
+
+    # 2. Determine feedback text
+    feedback_key_map = {
+        "poll_good": "poll_feedback_good",
+        "poll_bad": "poll_feedback_bad",
+        "poll_money": "poll_feedback_money"
+    }
+    feedback_key = feedback_key_map.get(vote)
+    feedback_text = get_text(feedback_key, lang)
+
+    # 3. Edit the message to show feedback and the close button
+    try:
+        original_text = query.message.text
+        new_text = f"{original_text}\n\n*{feedback_text}*"
+
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=new_text,
+            reply_markup=poll_close_keyboard(lang),
+            parse_mode="Markdown"
+        )
+    except BadRequest as e:
+        logger.error(f"Error editing poll message for vote feedback: {e}")
+
+
+async def handle_poll_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the 'Close' button on a poll."""
+    query = update.callback_query
+    await query.answer()
+    try:
+        await context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
+        logger.info(f"Closed poll message for user {query.message.chat_id}")
+    except BadRequest as e:
+        logger.error(f"Could not delete poll message: {e}")
+
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Main callback query handler."""
     query = update.callback_query
@@ -1154,6 +1233,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await set_language(update, context)
         elif data == "change_language":
             await change_language(update, context)
+        elif data in ["poll_good", "poll_bad", "poll_money"]:
+            await handle_poll_vote(update, context)
+        elif data == "poll_close":
+            await handle_poll_close(update, context)
 
     except Exception as e:
         logger.error(f"Error in button handler: {e}")
