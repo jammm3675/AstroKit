@@ -128,6 +128,16 @@ TEXTS = {
         "en": "⚙️ *Settings*",
         "zh": "⚙️ *设置*"
     },
+    "change_language_button": {
+        "ru": "🌐 Сменить язык",
+        "en": "🌐 Change Language",
+        "zh": "🌐 更改语言"
+    },
+    "settings_menu_description": {
+        "ru": "Здесь вы можете изменить язык или управлять уведомлениями.",
+        "en": "Here you can change the language or manage notifications.",
+        "zh": "在这里，您可以更改语言或管理通知。"
+    },
     "notifications_status_line": {
         "ru": "🔔 Ежедневные уведомления: {status}",
         "en": "🔔 Daily notifications: {status}",
@@ -144,11 +154,6 @@ TEXTS = {
         "ru": "🔕 Выключить уведомления",
         "en": "🔕 Disable notifications",
         "zh": "🔕 禁用通知"
-    },
-    "change_language_button": {
-        "ru": "🌐 Сменить язык",
-        "en": "🌐 Change Language",
-        "zh": "🌐 更改语言"
     },
 
     # --- Premium / Support ---
@@ -245,10 +250,10 @@ TEXTS = {
         "en": "CRYPTO-HOROSCOPE",
         "zh": "加密星座运势"
     },
-    "daily_notification_title": {
-        "ru": "🔮 Ваш персональный гороскоп на сегодня!",
-        "en": "🔮 Your personal horoscope for today!",
-        "zh": "🔮 您今天的个人星座运势！"
+    "daily_placeholder_notification": {
+        "ru": "Это ваше ежедневное уведомление! Скоро здесь будут гороскопы с опросами.",
+        "en": "This is your daily notification! Horoscopes with polls will be here soon.",
+        "zh": "这是您的每日通知！带有投票的星座运势即将推出。"
     },
     "daily_notification_title_poll": {
         "ru": "📊 Ваш ежедневный прогноз + Оценка точности",

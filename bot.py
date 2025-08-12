@@ -264,13 +264,13 @@ def get_user_data(chat_id: int) -> dict:
             "last_update": None,
             "tip_index": None,
             "horoscope_indices": {},
-            "is_new_user": True
+            "is_new_user": True,
+            "votes": []
         }
-    # Backward compatibility for old keys
-    if "notifications" in user_data[chat_id]:
-        user_data[chat_id]["notifications_enabled"] = user_data[chat_id].pop("notifications")
-    if "polls_enabled" in user_data[chat_id]:
-        user_data[chat_id]["notifications_enabled"] = user_data[chat_id].pop("polls_enabled")
+
+    # Ensure existing users have the necessary keys
+    if "notifications_enabled" not in user_data[chat_id]:
+        user_data[chat_id]["notifications_enabled"] = True
     if "votes" not in user_data[chat_id]:
         user_data[chat_id]["votes"] = []
 
@@ -815,6 +815,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     text = (
         f"*{get_text('settings_title', lang)}*\n\n"
+        f"{get_text('settings_menu_description', lang)}\n\n"
         f"{get_text('notifications_status_line', lang).format(status=get_text(status_key, lang))}"
     )
     
@@ -975,8 +976,9 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{tip_text}"
     await update.message.reply_text(text, parse_mode="Markdown")
 
-def format_single_horoscope_notification(lang: str) -> str:
-    """Formats a daily notification with a single random horoscope."""
+
+def format_poll_notification(lang: str) -> str:
+    """Formats a daily poll notification with a single random horoscope."""
     # 1. Select a random zodiac sign
     sign_ru = random.choice(ZODIAC_SIGNS["ru"])
     sign_lang = ZODIAC_CALLBACK_MAP.get(lang, {}).get(sign_ru, sign_ru)
@@ -1006,20 +1008,24 @@ def format_single_horoscope_notification(lang: str) -> str:
         f"{disclaimer_text}"
     )
 
-async def send_daily_horoscope_job(context: ContextTypes.DEFAULT_TYPE):
-    """Job to send a daily horoscope to all users with notifications enabled."""
-    logger.info("Starting daily horoscope job for users...")
+async def daily_notification_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to send a daily notification to all users with notifications enabled."""
+    logger.info("Starting daily notification job...")
 
-    # Create a copy of user_data keys to avoid issues with modification during iteration
+    # A deep copy of user_data keys to avoid issues with modification during iteration
     chat_ids = list(user_data.keys())
 
+    successful_sends = 0
+    failed_sends = 0
+
     for chat_id in chat_ids:
+        # It's better to fetch user_info inside the loop to ensure we have the latest data
         user_info = get_user_data(chat_id)
+
         if user_info.get("notifications_enabled"):
             lang = user_info.get("language", "ru")
 
-            # Generate a unique message for each user
-            message_text = format_single_horoscope_notification(lang)
+            message_text = format_poll_notification(lang)
 
             try:
                 await context.bot.send_message(
@@ -1028,11 +1034,20 @@ async def send_daily_horoscope_job(context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="Markdown",
                     reply_markup=poll_keyboard(lang)
                 )
-                logger.info(f"Sent daily horoscope to user {chat_id}")
-                # Add a small delay to avoid hitting rate limits
-                await asyncio.sleep(0.2)
+                logger.info(f"Sent daily notification to user {chat_id}")
+                successful_sends += 1
+                # Add a small delay to avoid hitting Telegram's rate limits
+                await asyncio.sleep(0.1)
             except (BadRequest, TelegramError) as e:
-                logger.error(f"Failed to send daily horoscope to {chat_id}: {e}")
+                logger.error(f"Failed to send daily notification to {chat_id}: {e}")
+                failed_sends += 1
+                # Automatically disable notifications for users who have blocked the bot
+                if "bot was blocked" in str(e).lower() or "user is deactivated" in str(e).lower():
+                    logger.warning(f"User {chat_id} has blocked the bot. Disabling notifications.")
+                    user_info["notifications_enabled"] = False
+
+    logger.info(f"Daily notification job finished. Successful: {successful_sends}, Failed: {failed_sends}")
+
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     """Job to broadcast the daily summary to all subscribed channels."""
@@ -1145,7 +1160,6 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         text=thank_you_text,
         reply_markup=back_to_menu_keyboard(lang)
     )
-
 
 async def handle_poll_vote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handles a vote from the accuracy poll."""
@@ -1339,10 +1353,10 @@ def main() -> None:
     if application.job_queue:
         moscow_tz = pytz.timezone("Europe/Moscow")
 
-        # Schedule daily horoscope job for users
-        horoscope_time = datetime.strptime("19:00", "%H:%M").time().replace(tzinfo=moscow_tz)
-        application.job_queue.run_daily(send_daily_horoscope_job, time=horoscope_time, name="daily_horoscope_job")
-        logger.info("📅 Daily horoscope job for users scheduled for 19:00 Moscow time.")
+        # Schedule daily notification job for users
+        notification_time = datetime.strptime("19:00", "%H:%M").time().replace(tzinfo=moscow_tz)
+        application.job_queue.run_daily(daily_notification_job, time=notification_time, name="daily_notification_job")
+        logger.info("📅 Daily notification job scheduled for 19:00 Moscow time.")
 
         # Schedule daily broadcast job
         broadcast_time = datetime.strptime("00:00", "%H:%M").time().replace(tzinfo=moscow_tz)
