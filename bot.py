@@ -69,6 +69,12 @@ CRYPTO_IDS = {
 # Хранение данных пользователей (индивидуально для каждого пользователя)
 user_data = {}
 
+# Глобальная информация для отладки
+debug_info = {
+    "last_keep_alive": None,
+    "keep_alive_status": "Not started"
+}
+
 # Глобальное хранилище курсов криптовалют с кэшированием
 crypto_prices = {
     "btc": {"price": None, "change": None, "last_update": None, "source": None},
@@ -1219,6 +1225,61 @@ async def handle_poll_close(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         logger.error(f"Could not delete poll message: {e}")
 
 
+async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Provides debugging information about the bot's state."""
+    chat_id = update.effective_chat.id
+    # In a real-world scenario, you might want to restrict this command to admins.
+    # For example: if chat_id not in ADMIN_CHAT_IDS: return
+
+    moscow_tz = pytz.timezone("Europe/Moscow")
+    now_utc = datetime.now(pytz.utc)
+    now_moscow = now_utc.astimezone(moscow_tz)
+
+    # 1. Get Job Queue info
+    jobs_info = "No scheduled jobs found or JobQueue not available."
+    if context.job_queue:
+        jobs = context.job_queue.jobs()
+        if jobs:
+            jobs_info_list = []
+            for job in jobs:
+                next_run_utc = job.next_t.astimezone(pytz.utc) if job.next_t else "N/A"
+                next_run_moscow_str = next_run_utc.astimezone(moscow_tz).strftime('%Y-%m-%d %H:%M:%S %Z') if next_run_utc != 'N/A' else 'N/A'
+                jobs_info_list.append(
+                    f"  - Job: *{job.name}*\n"
+                    f"    Next Run (MSK): `{next_run_moscow_str}`"
+                )
+            jobs_info = "\n".join(jobs_info_list)
+        else:
+            jobs_info = "JobQueue is running but has no scheduled jobs."
+
+    # 2. Count users with notifications enabled
+    users_with_notifications = sum(1 for u in user_data.values() if u.get("notifications_enabled"))
+
+    # 3. Get keep-alive info
+    last_keep_alive_utc_str = debug_info['last_keep_alive']
+    last_keep_alive_info = "Never"
+    if last_keep_alive_utc_str:
+        last_keep_alive_utc = datetime.fromisoformat(last_keep_alive_utc_str)
+        last_keep_alive_moscow = last_keep_alive_utc.astimezone(moscow_tz)
+        last_keep_alive_info = f"`{last_keep_alive_moscow.strftime('%Y-%m-%d %H:%M:%S %Z')}`"
+
+    keep_alive_status_info = f"`{debug_info['keep_alive_status']}`"
+
+    text = (
+        f"🤖 *Bot Debug Information*\n\n"
+        f"🕒 *Server Time:*\n"
+        f"  - MSK: `{now_moscow.strftime('%Y-%m-%d %H:%M:%S %Z')}`\n\n"
+        f"🔔 *Notifications:*\n"
+        f"  - Users with notifications on: `{users_with_notifications}`\n\n"
+        f"⏰ *Scheduled Jobs:*\n{jobs_info}\n\n"
+        f"❤️ *Keep-Alive Status:*\n"
+        f"  - Last successful run (MSK): {last_keep_alive_info}\n"
+        f"  - Current status: {keep_alive_status_info}"
+    )
+
+    await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
+
+
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Main callback query handler."""
     query = update.callback_query
@@ -1284,15 +1345,21 @@ def keep_alive():
             
             if response.status_code == 200:
                 logger.info(f"✅ Keep-alive успешен: {response.status_code}")
+                debug_info["last_keep_alive"] = datetime.now(pytz.utc).isoformat()
+                debug_info["keep_alive_status"] = "OK"
             else:
                 logger.warning(f"⚠️ Keep-alive: неожиданный статус {response.status_code}")
+                debug_info["keep_alive_status"] = f"Unexpected status: {response.status_code}"
                 
         except requests.exceptions.Timeout:
             logger.warning("⏰ Keep-alive: таймаут запроса")
-        except requests.exceptions.ConnectionError:
-            logger.error("🔌 Keep-alive: ошибка подключения")
+            debug_info["keep_alive_status"] = "Request timed out"
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"🔌 Keep-alive: ошибка подключения - {e}")
+            debug_info["keep_alive_status"] = "Connection error"
         except Exception as e:
-            logger.error(f"❌ Keep-alive ошибка: {e}")
+            logger.error(f"❌ Keep-alive непредвиденная ошибка: {e}")
+            debug_info["keep_alive_status"] = f"An unexpected error occurred: {e}"
         
         # Увеличиваем интервал до 14 минут для Render
         time.sleep(14 * 60)  # 14 минут
@@ -1340,6 +1407,7 @@ def main() -> None:
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("debug", debug_command))
     application.add_handler(CommandHandler("astro", astro_command, filters=filters.ALL))
     application.add_handler(CommandHandler("day", day_command, filters=filters.ALL))
     application.add_handler(CallbackQueryHandler(button_handler))
