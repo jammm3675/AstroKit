@@ -292,8 +292,20 @@ def update_user_horoscope(chat_id: int):
     moscow_tz = pytz.timezone("Europe/Moscow")
     today_moscow = datetime.now(moscow_tz).date()
 
-    # The value from user_data could be a date object (from previous runs) or None
-    if user_info.get("last_update") != today_moscow:
+    # The `last_update` is stored as a string in JSON, so it needs to be parsed back to a date object.
+    last_update_val = user_info.get("last_update")
+    last_update_date = None
+    if isinstance(last_update_val, str):
+        try:
+            # Handles ISO format dates like "YYYY-MM-DD"
+            last_update_date = date.fromisoformat(last_update_val)
+        except (ValueError, TypeError):
+            logger.warning(f"Could not parse last_update_date string '{last_update_val}' for user {chat_id}.")
+    elif isinstance(last_update_val, date):
+        # Handles cases where the value is already a date object (e.g., within the same session)
+        last_update_date = last_update_val
+
+    if last_update_date != today_moscow:
         logger.info(f"Updating daily content for user {chat_id} for date {today_moscow}")
         user_info["last_update"] = today_moscow
 
