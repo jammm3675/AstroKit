@@ -69,12 +69,6 @@ CRYPTO_IDS = {
 # Хранение данных пользователей (индивидуально для каждого пользователя)
 user_data = {}
 
-# Глобальная информация для отладки
-debug_info = {
-    "last_keep_alive": None,
-    "keep_alive_status": "Not started"
-}
-
 # Глобальное хранилище курсов криптовалют с кэшированием
 crypto_prices = {
     "btc": {"price": None, "change": None, "last_update": None, "source": None},
@@ -266,19 +260,18 @@ def get_user_data(chat_id: int) -> dict:
     if chat_id not in user_data:
         user_data[chat_id] = {
             "language": None,
-            "notifications_enabled": True,
             "last_update": None,
             "tip_index": None,
             "horoscope_indices": {},
-            "is_new_user": True,
-            "votes": []
+            "is_new_user": True
         }
-
-    # Ensure existing users have the necessary keys
-    if "notifications_enabled" not in user_data[chat_id]:
-        user_data[chat_id]["notifications_enabled"] = True
-    if "votes" not in user_data[chat_id]:
-        user_data[chat_id]["votes"] = []
+    # Backward compatibility for old keys - notifications removed
+    if "notifications" in user_data[chat_id]:
+        user_data[chat_id].pop("notifications", None)
+    if "polls_enabled" in user_data[chat_id]:
+        user_data[chat_id].pop("polls_enabled", None)
+    if "notifications_enabled" in user_data[chat_id]:
+        user_data[chat_id].pop("notifications_enabled", None)
 
     return user_data[chat_id]
 
@@ -292,20 +285,8 @@ def update_user_horoscope(chat_id: int):
     moscow_tz = pytz.timezone("Europe/Moscow")
     today_moscow = datetime.now(moscow_tz).date()
 
-    # The `last_update` is stored as a string in JSON, so it needs to be parsed back to a date object.
-    last_update_val = user_info.get("last_update")
-    last_update_date = None
-    if isinstance(last_update_val, str):
-        try:
-            # Handles ISO format dates like "YYYY-MM-DD"
-            last_update_date = date.fromisoformat(last_update_val)
-        except (ValueError, TypeError):
-            logger.warning(f"Could not parse last_update_date string '{last_update_val}' for user {chat_id}.")
-    elif isinstance(last_update_val, date):
-        # Handles cases where the value is already a date object (e.g., within the same session)
-        last_update_date = last_update_val
-
-    if last_update_date != today_moscow:
+    # The value from user_data could be a date object (from previous runs) or None
+    if user_info.get("last_update") != today_moscow:
         logger.info(f"Updating daily content for user {chat_id} for date {today_moscow}")
         user_info["last_update"] = today_moscow
 
@@ -541,6 +522,7 @@ def main_menu_keyboard(lang: str):
             InlineKeyboardButton(get_text("settings_button", lang), callback_data="settings_menu")
         ],
         [
+            InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info"),
             InlineKeyboardButton(get_text("premium_button", lang), callback_data="premium_menu")
         ]
     ])
@@ -585,34 +567,9 @@ def zodiac_keyboard(lang: str):
 
 def settings_keyboard(chat_id: int, lang: str):
     """Creates the settings keyboard in the specified language."""
-    user_info = get_user_data(chat_id)
-    notifications_on = user_info.get("notifications_enabled", True)
-    
-    toggle_key = "toggle_notifications_off_button" if notifications_on else "toggle_notifications_on_button"
-    toggle_text = get_text(toggle_key, lang)
-    
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(toggle_text, callback_data="toggle_notifications")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
-    ])
-
-
-def poll_keyboard(lang: str):
-    """Creates the poll keyboard."""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(get_text("poll_button_good", lang), callback_data="poll_good"),
-            InlineKeyboardButton(get_text("poll_button_bad", lang), callback_data="poll_bad"),
-            InlineKeyboardButton(get_text("poll_button_money", lang), callback_data="poll_money"),
-        ]
-    ])
-
-
-def poll_close_keyboard(lang: str):
-    """Creates the close button keyboard."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("poll_close_button", lang), callback_data="poll_close")]
     ])
 
 
@@ -827,14 +784,9 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
     
-    user_info = get_user_data(chat_id)
-    notifications_on = user_info.get("notifications_enabled", True)
-    status_key = "notifications_on" if notifications_on else "notifications_off"
-    
     text = (
         f"*{get_text('settings_title', lang)}*\n\n"
-        f"{get_text('settings_menu_description', lang)}\n\n"
-        f"{get_text('notifications_status_line', lang).format(status=get_text(status_key, lang))}"
+        f"Здесь вы можете изменить язык."
     )
     
     try:
@@ -864,23 +816,6 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         text=lang_prompt,
         reply_markup=language_keyboard()
     )
-
-async def toggle_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Toggles user notifications on or off."""
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat_id
-    
-    user_info = get_user_data(chat_id)
-    new_status = not user_info.get("notifications_enabled", True)
-    user_info["notifications_enabled"] = new_status
-    
-    status_text = "enabled" if new_status else "disabled"
-    logger.info(f"Notifications for user {chat_id} are now {status_text}")
-    
-    # Show updated settings menu
-    await show_settings_menu(update, context)
-
 
 # --- Channel Broadcast Feature ---
 
@@ -995,78 +930,6 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(text, parse_mode="Markdown")
 
 
-def format_poll_notification(lang: str) -> str:
-    """Formats a daily poll notification with a single random horoscope."""
-    # 1. Select a random zodiac sign
-    sign_ru = random.choice(ZODIAC_SIGNS["ru"])
-    sign_lang = ZODIAC_CALLBACK_MAP.get(lang, {}).get(sign_ru, sign_ru)
-
-    # 2. Get a random horoscope variant for that sign
-    horoscope_index = random.randint(0, len(HOROSCOPES_DB[lang][sign_lang]) - 1)
-    horoscope_text = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
-
-    # 3. Get market data
-    update_crypto_prices()
-    market_text = ""
-    for symbol in CRYPTO_IDS:
-        price_data = crypto_prices[symbol]
-        if price_data["price"] is not None and price_data["change"] is not None:
-            change_text, bar = format_change_bar(price_data["change"])
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text}\n{bar}\n"
-
-    # 4. Assemble the message
-    title = get_text('daily_notification_title_poll', lang)
-    disclaimer_text = get_text("horoscope_disclaimer", lang)
-
-    return (
-        f"*{title}*\n\n"
-        f"{horoscope_text}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"*{get_text('market_rates_title', lang).strip()}*\n{market_text}\n"
-        f"{disclaimer_text}"
-    )
-
-async def daily_notification_job(context: ContextTypes.DEFAULT_TYPE):
-    """Job to send a daily notification to all users with notifications enabled."""
-    logger.info("Starting daily notification job...")
-
-    # A deep copy of user_data keys to avoid issues with modification during iteration
-    chat_ids = list(user_data.keys())
-
-    successful_sends = 0
-    failed_sends = 0
-
-    for chat_id in chat_ids:
-        # It's better to fetch user_info inside the loop to ensure we have the latest data
-        user_info = get_user_data(chat_id)
-
-        if user_info.get("notifications_enabled"):
-            lang = user_info.get("language", "ru")
-
-            message_text = format_poll_notification(lang)
-
-            try:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=message_text,
-                    parse_mode="Markdown",
-                    reply_markup=poll_keyboard(lang)
-                )
-                logger.info(f"Sent daily notification to user {chat_id}")
-                successful_sends += 1
-                # Add a small delay to avoid hitting Telegram's rate limits
-                await asyncio.sleep(0.1)
-            except (BadRequest, TelegramError) as e:
-                logger.error(f"Failed to send daily notification to {chat_id}: {e}")
-                failed_sends += 1
-                # Automatically disable notifications for users who have blocked the bot
-                if "bot was blocked" in str(e).lower() or "user is deactivated" in str(e).lower():
-                    logger.warning(f"User {chat_id} has blocked the bot. Disabling notifications.")
-                    user_info["notifications_enabled"] = False
-
-    logger.info(f"Daily notification job finished. Successful: {successful_sends}, Failed: {failed_sends}")
-
-
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     """Job to broadcast the daily summary to all subscribed channels."""
     logger.info("Starting daily broadcast job...")
@@ -1162,6 +1025,27 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     else:
         await query.answer(ok=True)
 
+async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays the list of available commands."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
+
+    text = get_text("commands_info_text", lang)
+
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=text,
+            reply_markup=back_to_menu_keyboard(lang),
+            parse_mode="Markdown"
+        )
+    except BadRequest as e:
+        logger.error(f"Error showing commands info: {e}")
+
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Confirms the successful payment."""
     chat_id = update.message.chat.id
@@ -1178,119 +1062,6 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
         text=thank_you_text,
         reply_markup=back_to_menu_keyboard(lang)
     )
-
-async def handle_poll_vote(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles a vote from the accuracy poll."""
-    query = update.callback_query
-    await query.answer()
-
-    chat_id = query.message.chat_id
-    vote = query.data
-    lang = get_user_lang(chat_id)
-
-    # 1. Save the vote
-    user_info = get_user_data(chat_id)
-
-    user_info["votes"].append({
-        "vote": vote,
-        "timestamp": datetime.now().isoformat(),
-        "message_id": query.message.message_id
-    })
-    logger.info(f"User {chat_id} voted: {vote}")
-
-    # 2. Determine feedback text
-    feedback_key_map = {
-        "poll_good": "poll_feedback_good",
-        "poll_bad": "poll_feedback_bad",
-        "poll_money": "poll_feedback_money"
-    }
-    feedback_key = feedback_key_map.get(vote)
-    feedback_text = get_text(feedback_key, lang)
-
-    # 3. Edit the message to show feedback and the close button
-    try:
-        original_text = query.message.text
-        new_text = f"{original_text}\n\n*{feedback_text}*"
-
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=query.message.message_id,
-            text=new_text,
-            reply_markup=poll_close_keyboard(lang),
-            parse_mode="Markdown"
-        )
-    except BadRequest as e:
-        logger.error(f"Error editing poll message for vote feedback: {e}")
-
-
-async def handle_poll_close(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handles the 'Close' button on a poll."""
-    query = update.callback_query
-    await query.answer()
-    try:
-        await context.bot.delete_message(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id
-        )
-        logger.info(f"Closed poll message for user {query.message.chat_id}")
-    except BadRequest as e:
-        logger.error(f"Could not delete poll message: {e}")
-
-
-async def debug_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Provides debugging information about the bot's state."""
-    chat_id = update.effective_chat.id
-    # In a real-world scenario, you might want to restrict this command to admins.
-    # For example: if chat_id not in ADMIN_CHAT_IDS: return
-
-    moscow_tz = pytz.timezone("Europe/Moscow")
-    now_utc = datetime.now(pytz.utc)
-    now_moscow = now_utc.astimezone(moscow_tz)
-
-    # 1. Get Job Queue info
-    jobs_info = "No scheduled jobs found or JobQueue not available."
-    if context.job_queue:
-        jobs = context.job_queue.jobs()
-        if jobs:
-            jobs_info_list = []
-            for job in jobs:
-                next_run_utc = job.next_t.astimezone(pytz.utc) if job.next_t else "N/A"
-                next_run_moscow_str = next_run_utc.astimezone(moscow_tz).strftime('%Y-%m-%d %H:%M:%S %Z') if next_run_utc != 'N/A' else 'N/A'
-                jobs_info_list.append(
-                    f"  - Job: *{job.name}*\n"
-                    f"    Next Run (MSK): `{next_run_moscow_str}`"
-                )
-            jobs_info = "\n".join(jobs_info_list)
-        else:
-            jobs_info = "JobQueue is running but has no scheduled jobs."
-
-    # 2. Count users with notifications enabled
-    users_with_notifications = sum(1 for u in user_data.values() if u.get("notifications_enabled"))
-
-    # 3. Get keep-alive info
-    last_keep_alive_utc_str = debug_info['last_keep_alive']
-    last_keep_alive_info = "Never"
-    if last_keep_alive_utc_str:
-        last_keep_alive_utc = datetime.fromisoformat(last_keep_alive_utc_str)
-        last_keep_alive_moscow = last_keep_alive_utc.astimezone(moscow_tz)
-        last_keep_alive_info = f"`{last_keep_alive_moscow.strftime('%Y-%m-%d %H:%M:%S %Z')}`"
-
-    keep_alive_status_info = f"`{debug_info['keep_alive_status']}`"
-
-    text = (
-        f"🤖 *Bot Debug Information*\n\n"
-        f"🕒 *Server Time:*\n"
-        f"  - MSK: `{now_moscow.strftime('%Y-%m-%d %H:%M:%S %Z')}`\n\n"
-        f"🔔 *Notifications:*\n"
-        f"  - Users with notifications on: `{users_with_notifications}`\n\n"
-        f"⏰ *Scheduled Jobs:*\n{jobs_info}\n\n"
-        f"❤️ *Keep-Alive Status:*\n"
-        f"  - Last successful run (MSK): {last_keep_alive_info}\n"
-        f"  - Current status: {keep_alive_status_info}"
-    )
-
-    await context.bot.send_message(chat_id=chat_id, text=text, parse_mode="Markdown")
-
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Main callback query handler."""
@@ -1310,20 +1081,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await show_learning_tip(update, context)
         elif data == "settings_menu":
             await show_settings_menu(update, context)
-        elif data == "toggle_notifications":
-            await toggle_notifications(update, context)
         elif data == "premium_menu":
             await show_premium_menu(update, context)
+        elif data == "commands_info":
+            await show_commands_info(update, context)
         elif data == "support_stars":
             await support_with_stars(update, context)
         elif data.startswith("set_lang_"):
             await set_language(update, context)
         elif data == "change_language":
             await change_language(update, context)
-        elif data in ["poll_good", "poll_bad", "poll_money"]:
-            await handle_poll_vote(update, context)
-        elif data == "poll_close":
-            await handle_poll_close(update, context)
 
     except Exception as e:
         logger.error(f"Error in button handler: {e}")
@@ -1357,21 +1124,15 @@ def keep_alive():
             
             if response.status_code == 200:
                 logger.info(f"✅ Keep-alive успешен: {response.status_code}")
-                debug_info["last_keep_alive"] = datetime.now(pytz.utc).isoformat()
-                debug_info["keep_alive_status"] = "OK"
             else:
                 logger.warning(f"⚠️ Keep-alive: неожиданный статус {response.status_code}")
-                debug_info["keep_alive_status"] = f"Unexpected status: {response.status_code}"
                 
         except requests.exceptions.Timeout:
             logger.warning("⏰ Keep-alive: таймаут запроса")
-            debug_info["keep_alive_status"] = "Request timed out"
-        except requests.exceptions.ConnectionError as e:
-            logger.error(f"🔌 Keep-alive: ошибка подключения - {e}")
-            debug_info["keep_alive_status"] = "Connection error"
+        except requests.exceptions.ConnectionError:
+            logger.error("🔌 Keep-alive: ошибка подключения")
         except Exception as e:
-            logger.error(f"❌ Keep-alive непредвиденная ошибка: {e}")
-            debug_info["keep_alive_status"] = f"An unexpected error occurred: {e}"
+            logger.error(f"❌ Keep-alive ошибка: {e}")
         
         # Увеличиваем интервал до 14 минут для Render
         time.sleep(14 * 60)  # 14 минут
@@ -1419,7 +1180,6 @@ def main() -> None:
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("debug", debug_command))
     application.add_handler(CommandHandler("astro", astro_command, filters=filters.ALL))
     application.add_handler(CommandHandler("day", day_command, filters=filters.ALL))
     application.add_handler(CallbackQueryHandler(button_handler))
@@ -1432,11 +1192,6 @@ def main() -> None:
     # Задачи JobQueue
     if application.job_queue:
         moscow_tz = pytz.timezone("Europe/Moscow")
-
-        # Schedule daily notification job for users
-        notification_time = datetime.strptime("19:00", "%H:%M").time().replace(tzinfo=moscow_tz)
-        application.job_queue.run_daily(daily_notification_job, time=notification_time, name="daily_notification_job")
-        logger.info("📅 Daily notification job scheduled for 19:00 Moscow time.")
 
         # Schedule daily broadcast job
         broadcast_time = datetime.strptime("00:00", "%H:%M").time().replace(tzinfo=moscow_tz)

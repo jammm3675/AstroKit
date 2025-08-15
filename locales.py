@@ -80,6 +80,7 @@ TEXTS = {
     "tip_button": {"ru": "💡 Совет дня", "en": "💡 Tip of the day", "zh": "💡 今日提示"},
     "settings_button": {"ru": "⚙️ Настройки", "en": "⚙️ Settings", "zh": "⚙️ 设置"},
     "premium_button": {"ru": "✨ Поддержать", "en": "✨ Support", "zh": "✨ 支持"},
+    "commands_button": {"ru": "Команды", "en": "Commands", "zh": "命令"},
     "main_menu_button": {"ru": "⬅️ Назад", "en": "⬅️ Back", "zh": "⬅️ 返回"},
     "horoscope_back_button": {"ru": "Главное меню", "en": "Main Menu", "zh": "主菜单"},
 
@@ -132,28 +133,6 @@ TEXTS = {
         "ru": "🌐 Сменить язык",
         "en": "🌐 Change Language",
         "zh": "🌐 更改语言"
-    },
-    "settings_menu_description": {
-        "ru": "Здесь вы можете изменить язык или управлять уведомлениями.",
-        "en": "Here you can change the language or manage notifications.",
-        "zh": "在这里，您可以更改语言或管理通知。"
-    },
-    "notifications_status_line": {
-        "ru": "🔔 Ежедневные уведомления: {status}",
-        "en": "🔔 Daily notifications: {status}",
-        "zh": "🔔 每日通知: {status}"
-    },
-    "notifications_on": {"ru": "включены ✅", "en": "enabled ✅", "zh": "已启用 ✅"},
-    "notifications_off": {"ru": "выключены ❌", "en": "disabled ❌", "zh": "已禁用 ❌"},
-    "toggle_notifications_on_button": {
-        "ru": "🔔 Включить уведомления",
-        "en": "🔔 Enable notifications",
-        "zh": "🔔 启用通知"
-    },
-    "toggle_notifications_off_button": {
-        "ru": "🔕 Выключить уведомления",
-        "en": "🔕 Disable notifications",
-        "zh": "🔕 禁用通知"
     },
 
     # --- Premium / Support ---
@@ -250,49 +229,9 @@ TEXTS = {
         "en": "CRYPTO-HOROSCOPE",
         "zh": "加密星座运势"
     },
-    "daily_placeholder_notification": {
-        "ru": "Это ваше ежедневное уведомление! Скоро здесь будут гороскопы с опросами.",
-        "en": "This is your daily notification! Horoscopes with polls will be here soon.",
-        "zh": "这是您的每日通知！带有投票的星座运势即将推出。"
-    },
-    "daily_notification_title_poll": {
-        "ru": "📊 Ваш ежедневный прогноз + Оценка точности",
-        "en": "📊 Your daily forecast + Accuracy assessment",
-        "zh": "📊 您的每日预测 + 准确性评估"
-    },
-    "poll_button_good": {
-        "ru": "👍",
-        "en": "👍",
-        "zh": "👍"
-    },
-    "poll_button_bad": {
-        "ru": "👎",
-        "en": "👎",
-        "zh": "👎"
-    },
-    "poll_button_money": {
-        "ru": "💰",
-        "en": "💰",
-        "zh": "💰"
-    },
-    "poll_feedback_good": {
-        "ru": "Спасибо за вашу оценку! Рады, что вам понравилось. ✨",
-        "en": "Thanks for your feedback! Glad you liked it. ✨",
-        "zh": "感谢您的反馈！很高兴您喜欢。✨"
-    },
-    "poll_feedback_bad": {
-        "ru": "Спасибо за обратную связь! Мы учтем это для улучшения прогнозов. 🙏",
-        "en": "Thanks for the feedback! We will take this into account to improve our forecasts. 🙏",
-        "zh": "感谢您的反馈！我们会考虑这一点来改进我们的预测。🙏"
-    },
-    "poll_feedback_money": {
-        "ru": "Отлично! Желаем вам профита! 🚀",
-        "en": "Excellent! We wish you profits! 🚀",
-        "zh": "太棒了！祝您盈利！🚀"
-    },
-    "poll_close_button": {
-        "ru": "Закрыть",
-        "en": "Close",
-        "zh": "关闭"
+    "commands_info_text": {
+        "ru": "AstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня",
+        "en": "AstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day",
+        "zh": "AstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示"
     }
 }
