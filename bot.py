@@ -217,8 +217,6 @@ def generate_multilingual_horoscopes():
     horoscopes = {lang: {} for lang in supported_langs}
 
     for sign_ru in ZODIAC_SIGNS["ru"]:
-        thematic_emoji = ZODIAC_THEMATIC_EMOJIS.get(sign_ru, "✨")
-
         # Prepare variants for each language
         variants = {lang: [] for lang in supported_langs}
 
