@@ -242,8 +242,8 @@ def generate_multilingual_horoscopes():
                     action=action_data[lang],
                     asset=asset_text
                 )
-                # The body of the horoscope now contains the thematic emoji
-                full_text = f"{thematic_emoji} *{sign_lang}:*\n\n{text_lang}"
+                # The body of the horoscope no longer contains the thematic emoji title
+                full_text = text_lang
                 variants[lang].append(full_text)
 
         # Assign all generated variants to the database
@@ -522,7 +522,6 @@ def main_menu_keyboard(lang: str):
             InlineKeyboardButton(get_text("settings_button", lang), callback_data="settings_menu")
         ],
         [
-            InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info"),
             InlineKeyboardButton(get_text("premium_button", lang), callback_data="premium_menu")
         ]
     ])
@@ -568,6 +567,7 @@ def zodiac_keyboard(lang: str):
 def settings_keyboard(chat_id: int, lang: str):
     """Creates the settings keyboard in the specified language."""
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
@@ -590,7 +590,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_info = get_user_data(chat_id)
 
     if user_info.get("language") is None or user_info.get("is_new_user"):
-        lang_prompt = f"🇷🇺 {get_text('language_select', 'ru')} / 🇬🇧 {get_text('language_select', 'en')}"
+        lang_prompt = f"🇷🇺 {get_text('language_select', 'ru')} / 🇬🇧 {get_text('language_select', 'en')} / 🇨🇳 {get_text('language_select', 'zh')}"
         await context.bot.send_message(
             chat_id=chat_id,
             text=lang_prompt,
@@ -786,7 +786,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     text = (
         f"*{get_text('settings_title', lang)}*\n\n"
-        f"Здесь вы можете изменить язык."
+        f"{get_text('settings_menu_description', lang)}"
     )
     
     try:
