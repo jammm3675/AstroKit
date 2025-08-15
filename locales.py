@@ -134,6 +134,11 @@ TEXTS = {
         "en": "🌐 Change Language",
         "zh": "🌐 更改语言"
     },
+    "settings_menu_description": {
+        "ru": "Здесь вы можете настроить бота под себя. 🛠️",
+        "en": "Here you can customize the bot for yourself. 🛠️",
+        "zh": "在这里您可以为自己定制机器人。🛠️"
+    },
 
     # --- Premium / Support ---
     "premium_menu_title": {
@@ -230,8 +235,8 @@ TEXTS = {
         "zh": "加密星座运势"
     },
     "commands_info_text": {
-        "ru": "AstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня",
-        "en": "AstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day",
-        "zh": "AstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示"
+        "ru": "ℹ️ *Доступные команды:*\n\nAstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня\n\nДля настройки бота в вашем чате обратитесь в [поддержку](t.me/CryptoAstroSupport).",
+        "en": "ℹ️ *Available commands:*\n\nAstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day\n\nTo set up the bot in your chat, contact [support](t.me/CryptoAstroSupport).",
+        "zh": "ℹ️ *可用命令:*\n\nAstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示\n\n要在您的聊天中设置机器人，请联系[支持](t.me/CryptoAstroSupport)。"
     }
 }
