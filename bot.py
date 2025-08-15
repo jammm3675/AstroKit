@@ -532,16 +532,22 @@ def back_to_menu_keyboard(lang: str):
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
 
-def horoscope_back_keyboard(lang: str):
-    """Creates a specific back button for the horoscope view."""
+def main_menu_text_keyboard(lang: str):
+    """Creates a 'Main Menu' button to return to the main menu."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("horoscope_back_button", lang), callback_data="main_menu")]
+        [InlineKeyboardButton(get_text("main_menu_text_button", lang), callback_data="main_menu")]
     ])
 
 def back_to_premium_menu_keyboard(lang: str):
     """Creates a back button to the premium menu."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton(get_text("back_button", lang), callback_data="premium_menu")]
+    ])
+
+def back_to_settings_keyboard(lang: str):
+    """Creates a back button to the settings menu."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("back_button", lang), callback_data="settings_menu")]
     ])
 
 def zodiac_keyboard(lang: str):
@@ -567,7 +573,8 @@ def zodiac_keyboard(lang: str):
 def settings_keyboard(chat_id: int, lang: str):
     """Creates the settings keyboard in the specified language."""
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info")],
+        [InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info"),
+         InlineKeyboardButton(get_text("support_button", lang), callback_data="support_info")],
         [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
         [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
     ])
@@ -741,7 +748,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=horoscope_back_keyboard(lang),
+            reply_markup=main_menu_text_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -771,7 +778,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=main_menu_text_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -1046,6 +1053,27 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except BadRequest as e:
         logger.error(f"Error showing commands info: {e}")
 
+async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Displays the support information message."""
+    query = update.callback_query
+    await query.answer()
+
+    chat_id = query.message.chat_id
+    lang = get_user_lang(chat_id)
+
+    text = get_text("support_info_text", lang)
+
+    try:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=query.message.message_id,
+            text=text,
+            reply_markup=main_menu_text_keyboard(lang),
+            parse_mode="Markdown"
+        )
+    except BadRequest as e:
+        logger.error(f"Error showing support info: {e}")
+
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Confirms the successful payment."""
     chat_id = update.message.chat.id
@@ -1085,6 +1113,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await show_premium_menu(update, context)
         elif data == "commands_info":
             await show_commands_info(update, context)
+        elif data == "support_info":
+            await show_support_info(update, context)
         elif data == "support_stars":
             await support_with_stars(update, context)
         elif data.startswith("set_lang_"):
