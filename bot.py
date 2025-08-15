@@ -548,6 +548,15 @@ def back_to_settings_keyboard(lang: str):
         [InlineKeyboardButton(get_text("back_button", lang), callback_data="settings_menu")]
     ])
 
+def commands_nav_keyboard(lang: str):
+    """Creates the navigation keyboard for the Commands page."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(get_text("back_button", lang), callback_data="settings_menu"),
+            InlineKeyboardButton(get_text("main_menu_text_button", lang), callback_data="main_menu")
+        ]
+    ])
+
 def zodiac_keyboard(lang: str):
     """Creates the zodiac selection keyboard in the specified language."""
     zodiacs = ZODIAC_SIGNS[lang]
@@ -746,7 +755,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=main_menu_text_keyboard(lang),
+            reply_markup=back_to_settings_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -776,7 +785,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=main_menu_text_keyboard(lang),
+            reply_markup=commands_nav_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
