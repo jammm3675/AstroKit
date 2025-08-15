@@ -573,6 +573,13 @@ def settings_keyboard(chat_id: int, lang: str):
     ])
 
 
+def back_to_settings_keyboard(lang: str):
+    """Creates a back button to the settings menu."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="settings_menu")]
+    ])
+
+
 def language_keyboard():
     """Returns the language selection keyboard."""
     return InlineKeyboardMarkup([
@@ -771,7 +778,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=main_menu_text_keyboard(lang),
+            reply_markup=back_to_menu_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -1040,7 +1047,7 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=back_to_menu_keyboard(lang),
+            reply_markup=back_to_settings_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
@@ -1061,7 +1068,7 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=text,
-            reply_markup=main_menu_text_keyboard(lang),
+            reply_markup=back_to_settings_keyboard(lang),
             parse_mode="Markdown"
         )
     except BadRequest as e:
