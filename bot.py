@@ -1143,29 +1143,36 @@ def run_flask_server():
 
 def keep_alive():
     """Регулярные запросы для поддержания активности на Render"""
+    # Wait until the RENDER_EXTERNAL_URL is available
+    server_url = None
+    while not server_url:
+        server_url = os.environ.get('RENDER_EXTERNAL_URL')
+        if not server_url:
+            logger.info("⏳ RENDER_EXTERNAL_URL not found, waiting 10 seconds to retry...")
+            time.sleep(10)
+
+    health_url = f"{server_url}/health"
+    logger.info(f"🎯 Keep-alive target URL set to: {health_url}")
+
     while True:
         try:
-            # Получаем URL сервера
-            server_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:10000')
-            health_url = f"{server_url}/health"
-            
-            # Делаем запрос с таймаутом
-            response = requests.get(health_url, timeout=15)
+            # Make a request with a timeout
+            response = requests.get(health_url, timeout=20)
             
             if response.status_code == 200:
-                logger.info(f"✅ Keep-alive успешен: {response.status_code}")
+                logger.info(f"✅ Keep-alive successful: {response.status_code}")
             else:
-                logger.warning(f"⚠️ Keep-alive: неожиданный статус {response.status_code}")
+                logger.warning(f"⚠️ Keep-alive: unexpected status {response.status_code}")
                 
         except requests.exceptions.Timeout:
-            logger.warning("⏰ Keep-alive: таймаут запроса")
+            logger.warning("⏰ Keep-alive: request timed out")
         except requests.exceptions.ConnectionError:
-            logger.error("🔌 Keep-alive: ошибка подключения")
+            logger.error("🔌 Keep-alive: connection error")
         except Exception as e:
-            logger.error(f"❌ Keep-alive ошибка: {e}")
+            logger.error(f"❌ Keep-alive error: {e}")
         
-        # Увеличиваем интервал до 14 минут для Render
-        time.sleep(14 * 60)  # 14 минут
+        # Wait for 14 minutes for Render's free tier
+        time.sleep(14 * 60)
 
 def main() -> None:
     """Основная функция запуска бота с оптимизацией для Render"""
