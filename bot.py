@@ -1142,36 +1142,35 @@ def run_flask_server():
     app.run(host='0.0.0.0', port=port, threaded=True)
 
 def keep_alive():
-    """Регулярные запросы для поддержания активности на Render"""
-    # Wait until the RENDER_EXTERNAL_URL is available
-    server_url = None
-    while not server_url:
-        server_url = os.environ.get('RENDER_EXTERNAL_URL')
-        if not server_url:
-            logger.info("⏳ RENDER_EXTERNAL_URL not found, waiting 10 seconds to retry...")
-            time.sleep(10)
-
-    health_url = f"{server_url}/health"
-    logger.info(f"🎯 Keep-alive target URL set to: {health_url}")
-
+    """A more robust keep-alive function for Render that handles URL changes."""
+    logger.info("Starting keep-alive thread...")
     while True:
+        server_url = os.environ.get('RENDER_EXTERNAL_URL')
+
+        if not server_url:
+            logger.warning("⚠️ RENDER_EXTERNAL_URL not found. Skipping keep-alive attempt. Retrying in 60s.")
+            time.sleep(60)
+            continue
+
+        health_url = f"{server_url}/health"
+
         try:
-            # Make a request with a timeout
-            response = requests.get(health_url, timeout=20)
+            response = requests.get(health_url, timeout=30) # Increased timeout
             
             if response.status_code == 200:
-                logger.info(f"✅ Keep-alive successful: {response.status_code}")
+                logger.info(f"✅ Keep-alive successful to {health_url}")
             else:
-                logger.warning(f"⚠️ Keep-alive: unexpected status {response.status_code}")
+                logger.warning(f"⚠️ Keep-alive to {health_url} returned status {response.status_code}")
                 
         except requests.exceptions.Timeout:
-            logger.warning("⏰ Keep-alive: request timed out")
+            logger.warning(f"⏰ Keep-alive request to {health_url} timed out.")
         except requests.exceptions.ConnectionError:
-            logger.error("🔌 Keep-alive: connection error")
+            logger.error(f"🔌 Keep-alive to {health_url} failed. The service might be spinning up or the URL changed.")
         except Exception as e:
-            logger.error(f"❌ Keep-alive error: {e}")
+            logger.error(f"❌ An unexpected error occurred during keep-alive ping to {health_url}: {e}")
         
-        # Wait for 14 minutes for Render's free tier
+        # Wait for 14 minutes before the next ping
+        logger.info("...keep-alive thread sleeping for 14 minutes...")
         time.sleep(14 * 60)
 
 def main() -> None:
