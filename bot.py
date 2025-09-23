@@ -1129,7 +1129,7 @@ class CustomApplication(Application):
     """
     Custom Application class to add __weakref__ to __slots__ for Python 3.13 compatibility.
     """
-    __slots__ = ('__weakref__',)
+    __slots__ = Application.__slots__ + ('__weakref__',)
 
 async def main() -> None:
     """Основная функция запуска бота"""
