@@ -1125,6 +1125,12 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Error in button handler: {e}")
         await query.answer(get_text("error_occurred", lang))
 
+class CustomApplication(Application):
+    """
+    Custom Application class to add __weakref__ to __slots__ for Python 3.13 compatibility.
+    """
+    __slots__ = ('__weakref__',)
+
 async def main() -> None:
     """Основная функция запуска бота"""
     if not BOT_TOKEN:
@@ -1148,7 +1154,7 @@ async def main() -> None:
 
     # Инициализация бота с JobQueue
     logger.info("🤖 Инициализация Telegram бота...")
-    application = Application.builder().token(BOT_TOKEN).build()
+    application = Application.builder().application_class(CustomApplication).token(BOT_TOKEN).build()
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
