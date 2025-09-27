@@ -3,7 +3,7 @@ services:
     name: astrokit-bot
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn web:app
+    startCommand: gunicorn --log-file - web:app
     envVars:
       - key: BOT_TOKEN
         sync: false
