@@ -8,6 +8,7 @@ import random
 import json
 from datetime import datetime, date, timedelta
 import pytz
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, SuccessfulPayment
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, ChatMemberHandler, filters, PreCheckoutQueryHandler, MessageHandler
 from telegram.error import TelegramError, BadRequest, Conflict
@@ -1125,6 +1126,53 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Error in button handler: {e}")
         await query.answer(get_text("error_occurred", lang))
 
+def run_flask_server():
+    """Запуск Flask-сервера для Render"""
+    app = Flask(__name__)
+
+    @app.route('/')
+    def home():
+        return "🤖 AstroKit Bot is running! UptimeRobot monitoring active."
+
+    @app.route('/health')
+    def health_check():
+        return "OK", 200
+
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port, threaded=True)
+
+def keep_alive():
+    """A more robust keep-alive function for Render that handles URL changes."""
+    logger.info("Starting keep-alive thread...")
+    while True:
+        server_url = os.environ.get('RENDER_EXTERNAL_URL')
+
+        if not server_url:
+            logger.warning("⚠️ RENDER_EXTERNAL_URL not found. Skipping keep-alive attempt. Retrying in 60s.")
+            time.sleep(60)
+            continue
+
+        health_url = f"{server_url}/health"
+
+        try:
+            response = requests.get(health_url, timeout=30) # Increased timeout
+
+            if response.status_code == 200:
+                logger.info(f"✅ Keep-alive successful to {health_url}")
+            else:
+                logger.warning(f"⚠️ Keep-alive to {health_url} returned status {response.status_code}")
+
+        except requests.exceptions.Timeout:
+            logger.warning(f"⏰ Keep-alive request to {health_url} timed out.")
+        except requests.exceptions.ConnectionError:
+            logger.error(f"🔌 Keep-alive to {health_url} failed. The service might be spinning up or the URL changed.")
+        except Exception as e:
+            logger.error(f"❌ An unexpected error occurred during keep-alive ping to {health_url}: {e}")
+
+        # Wait for 14 minutes before the next ping
+        logger.info("...keep-alive thread sleeping for 14 minutes...")
+        time.sleep(14 * 60)
+
 class CustomApplication(Application):
     """
     Custom Application class to add __weakref__ to __slots__ for Python 3.13+ compatibility,
@@ -1132,8 +1180,8 @@ class CustomApplication(Application):
     """
     __slots__ = Application.__slots__ + ('__weakref__',)
 
-async def main() -> None:
-    """Основная функция запуска бота"""
+def main() -> None:
+    """Основная функция запуска бота с оптимизацией для Render"""
     if not BOT_TOKEN:
         logger.error("❌ BOT_TOKEN не установлен!")
         return
@@ -1152,6 +1200,22 @@ async def main() -> None:
         update_crypto_prices()
     else:
         logger.info("✅ Используем кэшированные данные")
+
+    # Запуск Flask сервера в отдельном потоке
+    server_thread = threading.Thread(target=run_flask_server, name="FlaskServer")
+    server_thread.daemon = True
+    server_thread.start()
+    logger.info(f"🌐 HTTP сервер запущен на порту {os.environ.get('PORT', 10000)}")
+
+    # Keep-alive для Render (только если запущено на Render)
+    is_render = os.environ.get('RENDER') or os.environ.get('RENDER_EXTERNAL_URL')
+    if is_render:
+        wakeup_thread = threading.Thread(target=keep_alive, name="KeepAlive")
+        wakeup_thread.daemon = True
+        wakeup_thread.start()
+        logger.info("🔔 Keep-alive активирован (интервал: 14 минут)")
+    else:
+        logger.info("🏠 Локальный режим - keep-alive отключен")
 
     # Инициализация бота с JobQueue
     logger.info("🤖 Инициализация Telegram бота...")
@@ -1204,26 +1268,36 @@ async def main() -> None:
 
     logger.info("🤖 Бот запущен! Ожидание сообщений...")
     
-    try:
-        await application.initialize()
-        await application.start()
-        await application.start_polling(drop_pending_updates=True)
-        logger.info("✅ Бот успешно запущен в режиме опроса")
-        await application.idle()
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Bot received stop signal, shutting down.")
-    finally:
-        if application.updater and application.updater.is_running:
-            await application.updater.stop()
-        if application.running:
-            await application.stop()
-        await application.shutdown()
-        logger.info("✅ Бот остановлен")
+    # Запуск с улучшенной обработкой ошибок
+    max_retries = 5
+    retry_delay = 30  # Увеличена начальная задержка для Render
 
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"🔄 Попытка запуска {attempt+1}/{max_retries}")
+            application.run_polling(
+                drop_pending_updates=True,
+                allowed_updates=Update.ALL_TYPES,
+                poll_interval=2.0,  # Увеличенный интервал для стабильности
+                close_loop=False,
+                timeout=30
+            )
+            logger.info("✅ Бот успешно запущен")
+            break
+        except Conflict as e:
+            logger.error(f"⚠️ Конфликт (попытка {attempt+1}/{max_retries}): {e}")
+            if attempt < max_retries - 1:
+                logger.info(f"⏳ Повтор через {retry_delay} секунд...")
+                time.sleep(retry_delay)
+                retry_delay = min(retry_delay * 2, 300)  # Экспоненциальная задержка с максимумом 5 минут
+            else:
+                logger.error("❌ Достигнут лимит повторов. Бот остановлен.")
+        except Exception as e:
+            logger.error(f"❌ Неожиданная ошибка: {e}")
+            if attempt < max_retries - 1:
+                logger.info(f"⏳ Повтор через {retry_delay} секунд...")
+                time.sleep(retry_delay)
+            break
 
 if __name__ == "__main__":
-    # This part is for local testing. On Render, web.py runs this.
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Manually interrupted.")
+    main()
