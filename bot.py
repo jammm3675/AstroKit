@@ -1127,7 +1127,8 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 class CustomApplication(Application):
     """
-    Custom Application class to add __weakref__ to __slots__ for Python 3.13 compatibility.
+    Custom Application class to add __weakref__ to __slots__ for Python 3.13+ compatibility,
+    preventing a TypeError with the JobQueue.
     """
     __slots__ = Application.__slots__ + ('__weakref__',)
 
@@ -1206,20 +1207,14 @@ async def main() -> None:
     try:
         await application.initialize()
         await application.start()
-        await application.start_polling(
-            drop_pending_updates=True,
-            allowed_updates=Update.ALL_TYPES
-        )
+        await application.start_polling(drop_pending_updates=True)
         logger.info("✅ Бот успешно запущен в режиме опроса")
         await application.idle()
     except (KeyboardInterrupt, SystemExit):
         logger.info("Bot received stop signal, shutting down.")
-    except Exception as e:
-        logger.error(f"❌ Ошибка во время выполнения бота: {e}")
     finally:
-        logger.info("Shutting down application...")
         if application.updater and application.updater.is_running:
-            await application.stop_polling()
+            await application.updater.stop()
         if application.running:
             await application.stop()
         await application.shutdown()
@@ -1227,4 +1222,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # This part is for local testing. On Render, web.py runs this.
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Manually interrupted.")
