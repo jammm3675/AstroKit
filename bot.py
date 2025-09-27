@@ -505,8 +505,8 @@ def format_change_bar(percent_change):
     bar_length = 10
     filled = min(int(abs(percent_change) * bar_length / 10), bar_length)
     bar = "▰" * filled + "▱" * (bar_length - filled)
-    symbol = "▲" if percent_change >= 0 else "▼"
-    color = "🟢" if percent_change >= 0 else "🔴"
+    symbol = "›" if percent_change >= 0 else "‹"
+    color = "↑" if percent_change >= 0 else "↓"
     return f"{color} {symbol}{abs(percent_change):.1f}%", bar
 
 def main_menu_keyboard(lang: str):
@@ -715,8 +715,8 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             change_text, bar = format_change_bar(price_data["change"])
             last_update = price_data["last_update"].strftime("%H:%M") if price_data["last_update"] else "N/A"
             source = price_data.get("source", "unknown")
-            source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n{get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
+            source_emoji = {"coingecko": "▫️", "binance": "▫️", "cryptocompare": "▫️", "fallback": "▫️"}.get(source, "▫️")
+            market_text += f"> {symbol.upper()}: ${price_data['price']:,.2f} {change_text}\n> {bar}\n> {get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
 
     # Get the translated zodiac sign name for display
     display_zodiac = zodiac
@@ -734,10 +734,10 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
         horoscope_text = get_text('horoscope_unavailable', lang)
 
     disclaimer_text = get_text("horoscope_disclaimer", lang)
-    emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
+    # The emoji is removed from the title for a cleaner look
     text = (
-        f"*{emoji} {display_zodiac} | {current_date}*\n\n"
-        f"{horoscope_text}\n"
+        f"*{display_zodiac} | {current_date}*\n\n"
+        f"> {horoscope_text}\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"{market_text}"
         f"{disclaimer_text}"
