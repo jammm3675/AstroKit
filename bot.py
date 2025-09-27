@@ -1156,29 +1156,22 @@ def keep_alive():
 
         try:
             response = requests.get(health_url, timeout=30) # Increased timeout
-
+            
             if response.status_code == 200:
                 logger.info(f"✅ Keep-alive successful to {health_url}")
             else:
                 logger.warning(f"⚠️ Keep-alive to {health_url} returned status {response.status_code}")
-
+                
         except requests.exceptions.Timeout:
             logger.warning(f"⏰ Keep-alive request to {health_url} timed out.")
         except requests.exceptions.ConnectionError:
             logger.error(f"🔌 Keep-alive to {health_url} failed. The service might be spinning up or the URL changed.")
         except Exception as e:
             logger.error(f"❌ An unexpected error occurred during keep-alive ping to {health_url}: {e}")
-
+        
         # Wait for 14 minutes before the next ping
         logger.info("...keep-alive thread sleeping for 14 minutes...")
         time.sleep(14 * 60)
-
-class CustomApplication(Application):
-    """
-    Custom Application class to add __weakref__ to __slots__ for Python 3.13+ compatibility,
-    preventing a TypeError with the JobQueue.
-    """
-    __slots__ = Application.__slots__ + ('__weakref__',)
 
 def main() -> None:
     """Основная функция запуска бота с оптимизацией для Render"""
@@ -1200,7 +1193,7 @@ def main() -> None:
         update_crypto_prices()
     else:
         logger.info("✅ Используем кэшированные данные")
-
+    
     # Запуск Flask сервера в отдельном потоке
     server_thread = threading.Thread(target=run_flask_server, name="FlaskServer")
     server_thread.daemon = True
@@ -1219,7 +1212,7 @@ def main() -> None:
 
     # Инициализация бота с JobQueue
     logger.info("🤖 Инициализация Telegram бота...")
-    application = Application.builder().application_class(CustomApplication).token(BOT_TOKEN).build()
+    application = Application.builder().token(BOT_TOKEN).build()
     
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
@@ -1271,7 +1264,7 @@ def main() -> None:
     # Запуск с улучшенной обработкой ошибок
     max_retries = 5
     retry_delay = 30  # Увеличена начальная задержка для Render
-
+    
     for attempt in range(max_retries):
         try:
             logger.info(f"🔄 Попытка запуска {attempt+1}/{max_retries}")
