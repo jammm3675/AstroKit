@@ -625,20 +625,27 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user_info.get("is_new_user"):
         user_info["is_new_user"] = False
 
+        # Get raw texts
+        welcome_template = get_text("welcome", lang)
         agreement_link_text = get_text("user_agreement_link_text", lang)
         agreement_url = get_text("user_agreement_url", lang)
+
+        # Prepare placeholder values
+        escaped_first_name = escape_markdown(user.first_name, 2)
         agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
 
-        welcome_template = get_text("welcome", lang)
+        # Split the template to isolate placeholders and escape parts safely
+        parts = welcome_template.split('{first_name}')
+        sub_parts = parts[1].split('{user_agreement}')
 
-        # Escape the template first, then replace the placeholder with the pre-formatted link
-        welcome_text = escape_markdown(welcome_template, 2).replace(
-            escape_markdown('{user_agreement}', 2),
-            agreement_link
+        # Assemble the final text, ensuring only static parts are escaped
+        final_text = (
+            escape_markdown(parts[0], 2) +
+            escaped_first_name +
+            escape_markdown(sub_parts[0], 2) +
+            agreement_link +
+            escape_markdown(sub_parts[1], 2)
         )
-
-        # Now, format the rest of the placeholders like first_name
-        final_text = welcome_text.format(first_name=escape_markdown(user.first_name, 2))
 
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -1053,10 +1060,15 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    text = (
-        f"*{get_text('premium_menu_title', lang)}*\n\n"
-        f"{get_text('premium_menu_description', lang)}"
-    )
+    title_raw = get_text('premium_menu_title', lang)
+    description_raw = get_text('premium_menu_description', lang)
+
+    # Escape text for MarkdownV2 and apply formatting
+    title_md = f"**{escape_markdown(title_raw, 2)}**"
+    description_md = f"> {escape_markdown(description_raw, 2)}"
+
+    text = f"{title_md}\n\n{description_md}"
+
 
     try:
         await context.bot.edit_message_text(
@@ -1064,7 +1076,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message_id=query.message.message_id,
             text=text,
             reply_markup=premium_menu_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing premium menu: {e}")
