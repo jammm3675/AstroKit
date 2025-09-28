@@ -4,7 +4,6 @@ ZODIAC_SIGNS = {
     "zh": ["白羊座", "金牛座", "双子座", "巨蟹座", "狮子座", "处女座", "天秤座", "天蝎座", "射手座", "摩羯座", "水瓶座", "双鱼座"]
 }
 
-# This is a mapping from the Russian names used in callbacks to the English names
 ZODIAC_CALLBACK_MAP = {
     "en": dict(zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["en"])),
     "zh": dict(zip(ZODIAC_SIGNS["ru"], ZODIAC_SIGNS["zh"]))
@@ -59,9 +58,9 @@ TEXTS = {
         "zh": "选择你的语言"
     },
     "welcome": {
-        "ru": "✨ Добро пожаловать в AstroKit, {first_name}! ✨\n\n🌟 Ваш персональный крипто-астролог!\n📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\n\nВыбери интересующий раздел, но перед этим ознакомься с {user_agreement}.",
-        "en": "✨ Welcome to AstroKit, {first_name}! ✨\n\n🌟 Your personal crypto astrologer!\n📅 Based on star charts and market trends, I can give you advice for today!\n\nChoose a section you're interested in, but first, please read the {user_agreement}.",
-        "zh": "✨ 欢迎来到 AstroKit, {first_name}! ✨\n\n🌟 您的个人加密占星师！\n📅 根据星象图和市场趋势，我可以为您提供今日建议！\n\n选择您感兴趣的部分，但首先，请阅读{user_agreement}."
+        "ru": "Добро пожаловать в AstroKit, {first_name}!\n\nВаш персональный крипто-астролог!\nНа основе звездных карт и рыночных тенденций могу дать совет на сегодня!\n\nВыбери интересующий раздел, но перед этим ознакомься с {user_agreement}.",
+        "en": "Welcome to AstroKit, {first_name}!\n\nYour personal crypto astrologer!\nBased on star charts and market trends, I can give you advice for today!\n\nChoose a section you're interested in, but first, please read the {user_agreement}.",
+        "zh": "欢迎来到 AstroKit, {first_name}!\n\n您的个人加密占星师！\n根据星象图和市场趋势，我可以为您提供今日建议！\n\n选择您感兴趣的部分，但首先，请阅读{user_agreement}."
     },
     "welcome_back": {
         "ru": "С возвращением, {first_name}! Что вас интересует сегодня?",
@@ -71,9 +70,9 @@ TEXTS = {
 
     # --- Main Menu ---
     "main_menu_title": {
-        "ru": "✨ Главное меню ✨",
-        "en": "✨ Main Menu ✨",
-        "zh": "✨ 主菜单 ✨"
+        "ru": "Главное меню",
+        "en": "Main Menu",
+        "zh": "主菜单"
     },
     "main_menu_prompt": {
         "ru": "Выберите интересующий раздел:",
@@ -90,9 +89,9 @@ TEXTS = {
 
     # --- Horoscope ---
     "zodiac_select_title": {
-        "ru": "♈ Выберите ваш знак зодиака:",
-        "en": "♈ Select your zodiac sign:",
-        "zh": "♈ 选择你的星座:"
+        "ru": "Выберите ваш знак зодиака:",
+        "en": "Select your zodiac sign:",
+        "zh": "选择你的星座:"
     },
     "horoscope_unavailable": {
         "ru": "Гороскоп временно недоступен",
@@ -105,9 +104,9 @@ TEXTS = {
         "zh": "请记住，星座运势仅供娱乐。在做出财务决策之前，请务必自己进行研究。"
     },
     "market_rates_title": {
-        "ru": "📊 Курс криптовалют:",
-        "en": "📊 Crypto Rates:",
-        "zh": "📊 加密货币汇率:"
+        "ru": "Курс криптовалют:",
+        "en": "Crypto Rates:",
+        "zh": "加密货币汇率:"
     },
     "updated_at": {
         "ru": "Обновлено",
@@ -117,16 +116,16 @@ TEXTS = {
 
     # --- Tip of the day ---
     "tip_of_the_day_title": {
-        "ru": "💡 Совет дня",
-        "en": "💡 Tip of the Day",
-        "zh": "💡 每日提示"
+        "ru": "Совет дня",
+        "en": "Tip of the Day",
+        "zh": "每日提示"
     },
 
     # --- Settings ---
     "settings_title": {
-        "ru": "⚙️ Настройки",
-        "en": "⚙️ Settings",
-        "zh": "⚙️ 设置"
+        "ru": "Настройки",
+        "en": "Settings",
+        "zh": "设置"
     },
     "change_language_button": {
         "ru": "🌐 Сменить язык",
@@ -134,9 +133,9 @@ TEXTS = {
         "zh": "🌐 更改语言"
     },
     "settings_menu_description": {
-        "ru": "Здесь вы можете настроить бота под себя. 🛠️",
-        "en": "Here you can customize the bot for yourself. 🛠️",
-        "zh": "在这里您可以为自己定制机器人。🛠️"
+        "ru": "Здесь вы можете настроить бота под себя.",
+        "en": "Here you can customize the bot for yourself.",
+        "zh": "在这里您可以为自己定制机器人。"
     },
     "support_button": {
         "ru": "💌 Поддержка",
@@ -146,14 +145,14 @@ TEXTS = {
 
     # --- Premium / Support ---
     "premium_menu_title": {
-        "ru": "✨ Поддержать автора",
-        "en": "✨ Support the Author",
-        "zh": "✨ 支持作者"
+        "ru": "Поддержать автора",
+        "en": "Support the Author",
+        "zh": "支持作者"
     },
     "premium_menu_description": {
-        "ru": "Если вам нравится AstroKit, вы можете поддержать автора, отправив немного TON или используя Telegram Stars. Ваша поддержка помогает развивать проект! 🙏",
-        "en": "If you enjoy AstroKit, you can support the author by sending some TON or using Telegram Stars. Your support helps the project grow! 🙏",
-        "zh": "如果您喜欢 AstroKit，可以通过发送一些 TON 或使用 Telegram Stars 来支持作者。您的支持有助于项目成长！🙏"
+        "ru": "Если вам нравится AstroKit, вы можете поддержать автора, отправив немного TON или используя Telegram Stars. Ваша поддержка помогает развивать проект!",
+        "en": "If you enjoy AstroKit, you can support the author by sending some TON or using Telegram Stars. Your support helps the project grow!",
+        "zh": "如果您喜欢 AstroKit，可以通过发送一些 TON 或使用 Telegram Stars 来支持作者。您的支持有助于项目成长！"
     },
     "premium_button_ton": {
         "ru": "Отправить 0.1 TON",
@@ -166,9 +165,9 @@ TEXTS = {
         "zh": "捐 15 ⭐️"
     },
     "payment_thank_you": {
-        "ru": "Огромное спасибо за вашу поддержку! Это очень много значит для нас. ✨",
-        "en": "Thank you so much for your support! It means a lot to us. ✨",
-        "zh": "非常感谢您的支持！这对我们意义重大。✨"
+        "ru": "Огромное спасибо за вашу поддержку! Это очень много значит для нас.",
+        "en": "Thank you so much for your support! It means a lot to us.",
+        "zh": "非常感谢您的支持！这对我们意义重大。"
     },
     "stars_invoice_title": {
         "ru": "Поддержка AstroKit",
@@ -188,9 +187,9 @@ TEXTS = {
 
     # --- Generic Error ---
     "error_occurred": {
-        "ru": "⚠️ Произошла ошибка. Попробуйте позже.",
-        "en": "⚠️ An error occurred. Please try again later.",
-        "zh": "⚠️ 出现错误。请稍后再试。"
+        "ru": "Произошла ошибка. Попробуйте позже.",
+        "en": "An error occurred. Please try again later.",
+        "zh": "出现错误。请稍后再试。"
     },
 
     # --- Learning Tips ---
