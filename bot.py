@@ -718,7 +718,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     
     update_crypto_prices()
     
-    # --- Text Preparation and Escaping ---
+    # --- Text Preparation ---
     current_date = escape_markdown(datetime.now().strftime("%d.%m.%Y"))
 
     display_zodiac = zodiac
@@ -729,9 +729,9 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     user_info = get_user_data(chat_id)
     horoscope_index = user_info["horoscope_indices"].get(zodiac)
     if horoscope_index is not None:
-        horoscope_text = escape_markdown(HOROSCOPES_DB[lang][display_zodiac][horoscope_index])
+        horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index]
     else:
-        horoscope_text = escape_markdown(get_text('horoscope_unavailable', lang))
+        horoscope_text = get_text('horoscope_unavailable', lang)
 
     # --- Market Data ---
     market_data_items = []
@@ -741,43 +741,40 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
-            price_str = escape_markdown(f"${price_data['price']:,.2f}")
+            price_str = f"${price_data['price']:,.2f}"
             change_text, bar = format_change_bar(price_data["change"])
-            escaped_change_text = escape_markdown(change_text)
 
-            market_data_items.append(f"{symbol.upper()}: {price_str} {escaped_change_text} \\(24h\\)\n{bar}")
+            market_data_items.append(f"{symbol.upper()}: {price_str} {change_text} (24h)\n{bar}")
 
             if price_data["last_update"]:
-                last_update_time = escape_markdown(price_data["last_update"].strftime("%H:%M"))
+                last_update_time = price_data["last_update"].strftime("%H:%M")
                 source = price_data.get("source", "unknown")
                 last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
 
     market_data_str = "\n\n".join(market_data_items)
-    escaped_updated_at = escape_markdown(get_text('updated_at', lang))
-    update_line = f"{escaped_updated_at}: {last_update_time} {last_update_source_emoji}"
+    update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
 
     # --- Message Formatting ---
-    escaped_market_title = escape_markdown(get_text('market_rates_title', lang))
-
+    # Escape the components that will be placed inside the blockquote
     content_to_quote = (
-        f"{horoscope_text}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"*{escaped_market_title}*\n"
-        f"{market_data_str}\n\n"
-        f"{update_line}"
+        f"{escape_markdown(horoscope_text)}\n"
+        f"{escape_markdown('━━━━━━━━━━━━━━━━━━━')}\n"
+        f"*{escape_markdown(get_text('market_rates_title', lang))}*\n"
+        f"{escape_markdown(market_data_str)}\n\n"
+        f"{escape_markdown(update_line)}"
     )
 
-    # Format as a blockquote
     quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
 
-    disclaimer_text = escape_markdown(get_text("horoscope_disclaimer", lang))
+    # The disclaimer is outside the blockquote, so it needs its own escaping.
+    disclaimer_text = get_text("horoscope_disclaimer", lang)
+
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
 
-    # The title uses Markdown, so we only escape the dynamic parts
     text = (
         f"*{emoji} {escaped_display_zodiac} | {current_date}*\n\n"
         f"{quoted_content}\n\n"
-        f"_{disclaimer_text}_"
+        f"_{escape_markdown(disclaimer_text)}_"
     )
     
     try:
@@ -804,16 +801,17 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     tip_index = user_info.get("tip_index")
 
     if tip_index is not None:
-        tip_text = escape_markdown(TEXTS["learning_tips"][lang][tip_index])
+        tip_text = TEXTS["learning_tips"][lang][tip_index]
     else:
-        tip_text = escape_markdown(get_text('horoscope_unavailable', lang))  # Re-using a generic error message
+        tip_text = get_text('horoscope_unavailable', lang)  # Re-using a generic error message
 
-    # Format the tip as a blockquote
-    quoted_tip = "\n".join([f"> {line}" for line in tip_text.splitlines()])
+    # Escape the tip text before formatting it as a blockquote
+    quoted_tip = "\n".join([f"> {escape_markdown(line)}" for line in tip_text.splitlines()])
 
-    escaped_title = escape_markdown(get_text('tip_of_the_day_title', lang))
+    # The title contains its own formatting, so it should not be escaped.
+    title = get_text('tip_of_the_day_title', lang)
     text = (
-        f"*{escaped_title}*\n\n"
+        f"*{title}*\n\n"
         f"🌟 {quoted_tip}"
     )
 
@@ -936,12 +934,9 @@ def format_daily_summary(lang: str) -> str:
         horoscopes[sign_lang] = horoscope_text
 
 
-    # --- Text Preparation and Escaping ---
+    # --- Text Preparation ---
     current_date = escape_markdown(datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y"))
-
-    # Escape each horoscope text
-    escaped_horoscopes = [escape_markdown(text) for text in horoscopes.values()]
-    horoscope_section = "\n\n".join(escaped_horoscopes)
+    horoscope_section = "\n\n".join(horoscopes.values())
 
     # --- Market Data ---
     update_crypto_prices()
@@ -952,37 +947,31 @@ def format_daily_summary(lang: str) -> str:
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
-            price_str = escape_markdown(f"${price_data['price']:,.2f}")
+            price_str = f"${price_data['price']:,.2f}"
             change_text, bar = format_change_bar(price_data["change"])
-            escaped_change_text = escape_markdown(change_text)
-
-            market_data_items.append(f"{symbol.upper()}: {price_str} {escaped_change_text} \\(24h\\)\n{bar}")
-
+            market_data_items.append(f"{symbol.upper()}: {price_str} {change_text} (24h)\n{bar}")
             if price_data["last_update"]:
-                last_update_time = escape_markdown(price_data["last_update"].strftime("%H:%M"))
+                last_update_time = price_data["last_update"].strftime("%H:%M")
                 source = price_data.get("source", "unknown")
                 last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
 
     market_data_str = "\n\n".join(market_data_items)
-    escaped_updated_at = escape_markdown(get_text('updated_at', lang))
-    update_line = f"{escaped_updated_at}: {last_update_time} {last_update_source_emoji}"
+    update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
 
     # --- Message Formatting ---
-    escaped_market_title = escape_markdown(get_text('market_rates_title', lang))
-
     content_to_quote = (
-        f"{horoscope_section}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"*{escaped_market_title}*\n"
-        f"{market_data_str}\n\n"
-        f"{update_line}"
+        f"{escape_markdown(horoscope_section)}\n"
+        f"{escape_markdown('━━━━━━━━━━━━━━━━━━━')}\n"
+        f"*{escape_markdown(get_text('market_rates_title', lang))}*\n"
+        f"{escape_markdown(market_data_str)}\n\n"
+        f"{escape_markdown(update_line)}"
     )
 
     quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
 
-    title = escape_markdown(get_text('astro_command_title', lang))
+    title = get_text('astro_command_title', lang)
     return (
-        f"🌌 *{title} | {current_date}*\n\n"
+        f"🌌 *{escape_markdown(title)} | {current_date}*\n\n"
         f"{quoted_content}"
     )
 
@@ -1005,15 +994,14 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     tip_index = user_info.get("tip_index")
 
     if tip_index is not None:
-        tip_text = escape_markdown(TEXTS["learning_tips"][lang][tip_index])
+        tip_text = TEXTS["learning_tips"][lang][tip_index]
     else:
-        # If no tip is set (e.g., a user from before the update), show an error or a default.
-        tip_text = escape_markdown(TEXTS["learning_tips"][lang][0])
+        tip_text = TEXTS["learning_tips"][lang][0]
 
-    quoted_tip = "\n".join([f"> {line}" for line in tip_text.splitlines()])
-    escaped_title = escape_markdown(get_text('tip_of_the_day_title', lang))
+    quoted_tip = "\n".join([f"> {escape_markdown(line)}" for line in tip_text.splitlines()])
+    title = get_text('tip_of_the_day_title', lang)
 
-    text = f"*{escaped_title}*\n\n{quoted_tip}"
+    text = f"*{title}*\n\n{quoted_tip}"
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
@@ -1124,15 +1112,20 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    info_text = escape_markdown(get_text("commands_info_text", lang))
-    # Format the informational text as a blockquote
-    quoted_text = "\n".join([f"> {line}" for line in info_text.splitlines()])
+    title = get_text("commands_info_title", lang)
+    body = get_text("commands_info_body", lang)
+
+    # The title should not be escaped as it contains its own formatting.
+    # The body contains a pre-formatted link, so it should not be escaped either.
+    quoted_body = "\n".join([f"> {line}" for line in body.splitlines()])
+
+    text = f"{title}\n\n{quoted_body}"
 
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=quoted_text,
+            text=text,
             reply_markup=back_to_settings_keyboard(lang),
             parse_mode=ParseMode.MARKDOWN_V2
         )
@@ -1147,8 +1140,8 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    info_text = escape_markdown(get_text("support_info_text", lang))
-    # Format the informational text as a blockquote
+    # The text contains a pre-formatted link, so it should not be escaped.
+    info_text = get_text("support_info_text", lang)
     quoted_text = "\n".join([f"> {line}" for line in info_text.splitlines()])
 
     try:
