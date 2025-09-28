@@ -6,15 +6,22 @@ import requests
 import asyncio
 import random
 import json
+import re
 from datetime import datetime, date, timedelta
 import pytz
 from flask import Flask
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, SuccessfulPayment
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice, SuccessfulPayment, ParseMode
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, JobQueue, ChatMemberHandler, filters, PreCheckoutQueryHandler, MessageHandler
 from telegram.error import TelegramError, BadRequest, Conflict
 from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP, ZODIAC_EMOJIS
 
 # --- Helper Functions ---
+
+def escape_markdown(text: str) -> str:
+    """Escapes special characters for Telegram's MarkdownV2 parser."""
+    # The `_` and `*` characters are not escaped because they are used for formatting.
+    # All other special characters are escaped.
+    return re.sub(r'([\[\]\(\)~`>#\+\-=|{}\.!])', r'\\\1', text)
 
 def get_text(key: str, lang: str) -> str:
     """Retrieves a text string in the specified language."""
@@ -623,13 +630,17 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # If user is new, show full welcome message and set flag to false
     if user_info.get("is_new_user"):
         user_info["is_new_user"] = False
-        welcome_text = get_text("welcome", lang).format(first_name=user.first_name)
+        # The welcome text is assumed to be pre-formatted with MarkdownV2 syntax.
+        # We only need to escape the user's name.
+        escaped_first_name = escape_markdown(user.first_name)
+        welcome_text = get_text("welcome", lang).format(first_name=escaped_first_name)
+
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
             text=welcome_text,
             reply_markup=main_menu_keyboard(lang),
-            parse_mode="Markdown",
+            parse_mode=ParseMode.MARKDOWN_V2,
             disable_web_page_preview=True
         )
     else:
@@ -650,7 +661,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     update_crypto_prices()
     
     # Use a generic title for the main menu
-    text = get_text("main_menu_title", lang)
+    text = escape_markdown(get_text("main_menu_title", lang))
     
     try:
         if query:
@@ -660,16 +671,17 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 message_id=query.message.message_id,
                 text=text,
                 reply_markup=main_menu_keyboard(lang),
-                parse_mode="Markdown"
+                parse_mode=ParseMode.MARKDOWN_V2
             )
         else:
             # Send a new message if it's a command (e.g., from /start for a returning user)
-            welcome_text = get_text("welcome_back", lang).format(first_name=update.effective_user.first_name)
+            escaped_first_name = escape_markdown(update.effective_user.first_name)
+            welcome_text = get_text("welcome_back", lang).format(first_name=escaped_first_name)
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=welcome_text,
                 reply_markup=main_menu_keyboard(lang),
-                parse_mode="Markdown"
+                parse_mode=ParseMode.MARKDOWN_V2
             )
     except BadRequest as e:
         logger.error(f"Error showing main menu: {e}")
@@ -688,9 +700,9 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=get_text("zodiac_select_title", lang),
+            text=escape_markdown(get_text("zodiac_select_title", lang)),
             reply_markup=zodiac_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing horoscope menu: {e}")
@@ -705,21 +717,20 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     
     update_crypto_prices()
     
-    current_date = datetime.now().strftime("%d.%m.%Y")
+    # --- Text Preparation and Escaping ---
+    current_date = escape_markdown(datetime.now().strftime("%d.%m.%Y"))
 
-    # Get the translated zodiac sign name for display
     display_zodiac = zodiac
     if lang != "ru":
         display_zodiac = ZODIAC_CALLBACK_MAP.get(lang, {}).get(zodiac, zodiac)
+    escaped_display_zodiac = escape_markdown(display_zodiac)
 
-    # Get the horoscope text using the stored index for the user
     user_info = get_user_data(chat_id)
     horoscope_index = user_info["horoscope_indices"].get(zodiac)
-
     if horoscope_index is not None:
-        horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index]
+        horoscope_text = escape_markdown(HOROSCOPES_DB[lang][display_zodiac][horoscope_index])
     else:
-        horoscope_text = get_text('horoscope_unavailable', lang)
+        horoscope_text = escape_markdown(get_text('horoscope_unavailable', lang))
 
     # --- Market Data ---
     market_data_items = []
@@ -729,23 +740,28 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
+            price_str = escape_markdown(f"${price_data['price']:,.2f}")
             change_text, bar = format_change_bar(price_data["change"])
-            market_data_items.append(f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}")
+            escaped_change_text = escape_markdown(change_text)
+
+            market_data_items.append(f"{symbol.upper()}: {price_str} {escaped_change_text} \\(24h\\)\n{bar}")
+
             if price_data["last_update"]:
-                # The update time is the same for all, so we can just grab the last one
-                last_update_time = price_data["last_update"].strftime("%H:%M")
+                last_update_time = escape_markdown(price_data["last_update"].strftime("%H:%M"))
                 source = price_data.get("source", "unknown")
                 last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
 
     market_data_str = "\n\n".join(market_data_items)
-    update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
+    escaped_updated_at = escape_markdown(get_text('updated_at', lang))
+    update_line = f"{escaped_updated_at}: {last_update_time} {last_update_source_emoji}"
 
     # --- Message Formatting ---
-    # Combine the content that needs to be block-quoted
+    escaped_market_title = escape_markdown(get_text('market_rates_title', lang))
+
     content_to_quote = (
         f"{horoscope_text}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"*{get_text('market_rates_title', lang)}*\n"
+        f"*{escaped_market_title}*\n"
         f"{market_data_str}\n\n"
         f"{update_line}"
     )
@@ -753,12 +769,14 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     # Format as a blockquote
     quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
 
-    disclaimer_text = get_text("horoscope_disclaimer", lang)
+    disclaimer_text = escape_markdown(get_text("horoscope_disclaimer", lang))
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
+
+    # The title uses Markdown, so we only escape the dynamic parts
     text = (
-        f"*{emoji} {display_zodiac} | {current_date}*\n\n"
+        f"*{emoji} {escaped_display_zodiac} | {current_date}*\n\n"
         f"{quoted_content}\n\n"
-        f"{disclaimer_text}"
+        f"_{disclaimer_text}_"
     )
     
     try:
@@ -767,7 +785,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             message_id=query.message.message_id,
             text=text,
             reply_markup=main_menu_text_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing zodiac horoscope: {e}")
@@ -785,15 +803,16 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     tip_index = user_info.get("tip_index")
 
     if tip_index is not None:
-        tip_text = TEXTS["learning_tips"][lang][tip_index]
+        tip_text = escape_markdown(TEXTS["learning_tips"][lang][tip_index])
     else:
-        tip_text = get_text('horoscope_unavailable', lang)  # Re-using a generic error message
+        tip_text = escape_markdown(get_text('horoscope_unavailable', lang))  # Re-using a generic error message
 
     # Format the tip as a blockquote
     quoted_tip = "\n".join([f"> {line}" for line in tip_text.splitlines()])
 
+    escaped_title = escape_markdown(get_text('tip_of_the_day_title', lang))
     text = (
-        f"*{get_text('tip_of_the_day_title', lang)}*\n\n"
+        f"*{escaped_title}*\n\n"
         f"🌟 {quoted_tip}"
     )
 
@@ -803,7 +822,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message_id=query.message.message_id,
             text=text,
             reply_markup=back_to_menu_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing learning tip: {e}")
@@ -815,11 +834,12 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
     
-    description = get_text('settings_menu_description', lang)
+    escaped_title = escape_markdown(get_text('settings_title', lang))
+    description = escape_markdown(get_text('settings_menu_description', lang))
     quoted_description = "\n".join([f"> {line}" for line in description.splitlines()])
 
     text = (
-        f"*{get_text('settings_title', lang)}*\n\n"
+        f"*{escaped_title}*\n\n"
         f"{quoted_description}"
     )
     
@@ -829,7 +849,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
             message_id=query.message.message_id,
             text=text,
             reply_markup=settings_keyboard(chat_id, lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing settings menu: {e}")
@@ -915,9 +935,12 @@ def format_daily_summary(lang: str) -> str:
         horoscopes[sign_lang] = horoscope_text
 
 
-    # Format the horoscope section
-    current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
-    horoscope_section = "\n\n".join(horoscopes.values())
+    # --- Text Preparation and Escaping ---
+    current_date = escape_markdown(datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y"))
+
+    # Escape each horoscope text
+    escaped_horoscopes = [escape_markdown(text) for text in horoscopes.values()]
+    horoscope_section = "\n\n".join(escaped_horoscopes)
 
     # --- Market Data ---
     update_crypto_prices()
@@ -928,28 +951,35 @@ def format_daily_summary(lang: str) -> str:
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
+            price_str = escape_markdown(f"${price_data['price']:,.2f}")
             change_text, bar = format_change_bar(price_data["change"])
-            market_data_items.append(f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}")
+            escaped_change_text = escape_markdown(change_text)
+
+            market_data_items.append(f"{symbol.upper()}: {price_str} {escaped_change_text} \\(24h\\)\n{bar}")
+
             if price_data["last_update"]:
-                last_update_time = price_data["last_update"].strftime("%H:%M")
+                last_update_time = escape_markdown(price_data["last_update"].strftime("%H:%M"))
                 source = price_data.get("source", "unknown")
                 last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
 
     market_data_str = "\n\n".join(market_data_items)
-    update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
+    escaped_updated_at = escape_markdown(get_text('updated_at', lang))
+    update_line = f"{escaped_updated_at}: {last_update_time} {last_update_source_emoji}"
 
     # --- Message Formatting ---
+    escaped_market_title = escape_markdown(get_text('market_rates_title', lang))
+
     content_to_quote = (
         f"{horoscope_section}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"*{get_text('market_rates_title', lang)}*\n"
+        f"*{escaped_market_title}*\n"
         f"{market_data_str}\n\n"
         f"{update_line}"
     )
 
     quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
 
-    title = get_text('astro_command_title', lang)
+    title = escape_markdown(get_text('astro_command_title', lang))
     return (
         f"🌌 *{title} | {current_date}*\n\n"
         f"{quoted_content}"
@@ -960,7 +990,7 @@ async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     update_user_horoscope(update.message.chat_id)
     lang = get_user_lang(update.message.chat_id)
     full_message = format_daily_summary(lang)
-    await update.message.reply_text(full_message, parse_mode="Markdown")
+    await update.message.reply_text(full_message, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -974,14 +1004,16 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     tip_index = user_info.get("tip_index")
 
     if tip_index is not None:
-        tip_text = TEXTS["learning_tips"][lang][tip_index]
+        tip_text = escape_markdown(TEXTS["learning_tips"][lang][tip_index])
     else:
         # If no tip is set (e.g., a user from before the update), show an error or a default.
-        # For now, let's just show the first tip.
-        tip_text = TEXTS["learning_tips"][lang][0]
+        tip_text = escape_markdown(TEXTS["learning_tips"][lang][0])
 
-    text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{tip_text}"
-    await update.message.reply_text(text, parse_mode="Markdown")
+    quoted_tip = "\n".join([f"> {line}" for line in tip_text.splitlines()])
+    escaped_title = escape_markdown(get_text('tip_of_the_day_title', lang))
+
+    text = f"*{escaped_title}*\n\n{quoted_tip}"
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
@@ -995,7 +1027,7 @@ async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     full_message = format_daily_summary(lang="ru") # Broadcasts are in Russian by default
     for chat_id in chat_ids:
         try:
-            await context.bot.send_message(chat_id=chat_id, text=full_message, parse_mode="Markdown")
+            await context.bot.send_message(chat_id=chat_id, text=full_message, parse_mode=ParseMode.MARKDOWN_V2)
             logger.info(f"Successfully broadcasted to chat {chat_id}")
         except Exception as e:
             logger.error(f"Failed to broadcast to chat {chat_id}: {e}")
@@ -1028,11 +1060,12 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    description = get_text('premium_menu_description', lang)
+    escaped_title = escape_markdown(get_text('premium_menu_title', lang))
+    description = escape_markdown(get_text('premium_menu_description', lang))
     quoted_description = "\n".join([f"> {line}" for line in description.splitlines()])
 
     text = (
-        f"*{get_text('premium_menu_title', lang)}*\n\n"
+        f"*{escaped_title}*\n\n"
         f"{quoted_description}"
     )
     
@@ -1042,7 +1075,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message_id=query.message.message_id,
             text=text,
             reply_markup=premium_menu_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing premium menu: {e}")
@@ -1090,7 +1123,7 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    info_text = get_text("commands_info_text", lang)
+    info_text = escape_markdown(get_text("commands_info_text", lang))
     # Format the informational text as a blockquote
     quoted_text = "\n".join([f"> {line}" for line in info_text.splitlines()])
 
@@ -1100,7 +1133,7 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
             message_id=query.message.message_id,
             text=quoted_text,
             reply_markup=back_to_settings_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing commands info: {e}")
@@ -1113,7 +1146,7 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    info_text = get_text("support_info_text", lang)
+    info_text = escape_markdown(get_text("support_info_text", lang))
     # Format the informational text as a blockquote
     quoted_text = "\n".join([f"> {line}" for line in info_text.splitlines()])
 
@@ -1123,7 +1156,7 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message_id=query.message.message_id,
             text=quoted_text,
             reply_markup=back_to_settings_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing support info: {e}")
