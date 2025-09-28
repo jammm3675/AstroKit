@@ -349,8 +349,13 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         agreement_link_text = escape_markdown(get_text("user_agreement_link_text", lang), 2)
         agreement_url = get_text("user_agreement_url", lang)
         agreement_link = f'[{agreement_link_text}]({agreement_url})'
+
         welcome_text_template = escape_markdown(get_text("welcome", lang), 2)
-        welcome_text = welcome_text_template.format(first_name=escape_markdown(user.first_name, 2), user_agreement=agreement_link)
+        # Manually re-insert the unescaped link placeholder
+        welcome_text = welcome_text_template.replace(escape_markdown('{user_agreement}', 2), agreement_link)
+        # Format the rest of the placeholders
+        welcome_text = welcome_text.format(first_name=escape_markdown(user.first_name, 2))
+
         await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
     else:
         await show_main_menu(update, context)
@@ -362,11 +367,13 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = get_user_lang(chat_id)
     update_user_horoscope(chat_id)
     update_crypto_prices()
+
     title = f"✨ *{escape_markdown(get_text('main_menu_title', lang), 2)}* ✨"
     prompt = f"> {escape_markdown(get_text('main_menu_prompt', lang), 2)}"
-    text = f"{title}\n\n{prompt}"
+
     try:
         if query:
+            text = f"{title}\n\n{prompt}"
             await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
         else:
             welcome_back_raw = get_text("welcome_back", lang)
@@ -389,11 +396,14 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     update_crypto_prices()
+
     current_date = escape_markdown(datetime.now().strftime("%d.%m.%Y"), 2)
     display_zodiac = ZODIAC_CALLBACK_MAP.get(lang, {}).get(zodiac, zodiac) if lang != "ru" else zodiac
+
     horoscope_text = get_text('horoscope_unavailable', lang)
     if (horoscope_indices := get_user_data(chat_id).get("horoscope_indices")) and (horoscope_index := horoscope_indices.get(zodiac)) is not None:
         horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index]
+
     market_data_items = []
     last_update_time, last_update_source_emoji = "N/A", "❓"
     for symbol in CRYPTO_IDS:
@@ -404,14 +414,23 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             if price_data["last_update"]:
                 last_update_time = price_data["last_update"].strftime("%H:%M")
                 last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
+
     market_data_str = "\n\n".join(market_data_items)
     update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
     market_title = get_text('market_rates_title', lang)
+
     content_to_quote = f"*{escape_markdown(market_title, 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
-    quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
+    quoted_market_data = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
+
     disclaimer_text = get_text("horoscope_disclaimer", lang)
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
-    text = f"*{emoji} {escape_markdown(display_zodiac, 2)} | {current_date}*\n\n> {escape_markdown(horoscope_text, 2)}\n\n{quoted_content}\n\n_{escape_markdown(disclaimer_text, 2)}_"
+
+    text = (
+        f"*{emoji} {escape_markdown(display_zodiac, 2)} | {current_date}*\n\n"
+        f"{escape_markdown(horoscope_text, 2)}\n\n"
+        f"{quoted_market_data}\n\n"
+        f"_{escape_markdown(disclaimer_text, 2)}_"
+    )
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=main_menu_text_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -481,10 +500,10 @@ def format_daily_summary(lang: str) -> str:
                 last_update_time, last_update_source_emoji = price_data["last_update"].strftime("%H:%M"), {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
     market_data_str = "\n\n".join(market_data_items)
     update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
-    content_to_quote = f"{escape_markdown(horoscope_section, 2)}\n\n*{escape_markdown(get_text('market_rates_title', lang), 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
+    content_to_quote = f"*{escape_markdown(get_text('market_rates_title', lang), 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
     quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
     title = get_text('astro_command_title', lang)
-    return f"🌌 *{escape_markdown(title, 2)}* | {current_date}\n\n{quoted_content}"
+    return f"🌌 *{escape_markdown(title, 2)}* | {current_date}\n\n> {escape_markdown(horoscope_section, 2)}\n\n{quoted_content}"
 
 async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     update_user_horoscope(update.message.chat_id)
@@ -550,9 +569,10 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     title = get_text("commands_info_title", lang)
     support_link = f'[{escape_markdown(get_text("support_link_text", lang), 2)}]({get_text("support_url", lang)})'
     body_template = get_text("commands_info_body", lang)
-    body = body_template.replace("{support_link}", support_link)
-    quoted_body = "\n".join([f"> {line}" for line in escape_markdown(body, 2).replace(escape_markdown(support_link, 2), support_link).splitlines()])
-    text = f"*{escape_markdown(title, 2)}*\n\n{quoted_body}"
+    # This is tricky: we escape the whole body, then replace the escaped link with the unescaped one.
+    body_with_link = escape_markdown(body_template, 2).replace(escape_markdown('{support_link}', 2), support_link)
+    quoted_body = "\n".join([f"> {line}" for line in body_with_link.splitlines()])
+    text = f"ℹ️ *{escape_markdown(title, 2)}*\n\n{quoted_body}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=back_to_settings_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -561,8 +581,9 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     support_link = f'[{escape_markdown(get_text("support_link_text", lang), 2)}]({get_text("support_url", lang)})'
     info_text_template = get_text("support_info_text", lang)
-    info_text = info_text_template.format(support_link=support_link)
-    quoted_text = f"> {escape_markdown(info_text, 2).replace(escape_markdown(support_link, 2), support_link)}"
+    # This is tricky: we escape the whole body, then replace the escaped link with the unescaped one.
+    info_text = escape_markdown(info_text_template, 2).replace(escape_markdown('{support_link}', 2), support_link)
+    quoted_text = f"> {info_text}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=quoted_text, reply_markup=back_to_settings_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
