@@ -228,7 +228,6 @@ def update_user_horoscope(chat_id: int):
 def update_crypto_prices():
     try:
         if api_cache["last_update"] and (datetime.now() - api_cache["last_update"]).total_seconds() < api_cache["cache_duration"]:
-            logger.info("Using cached crypto prices.")
             return
         sources = ["coingecko", "binance", "cryptocompare"]
         _switch_api_source()
@@ -241,12 +240,9 @@ def update_crypto_prices():
             elif current_source == "cryptocompare": success = _update_from_cryptocompare()
             if success:
                 api_cache["last_update"] = datetime.now()
-                logger.info(f"Prices updated successfully from {current_source}")
                 save_cache_to_file()
                 return
-            logger.warning(f"Failed to update from {current_source}. Switching source.")
             _switch_api_source()
-        logger.error("All API sources failed. Using fallback data.")
         _use_fallback_data()
         save_cache_to_file()
     except Exception as e:
@@ -255,17 +251,13 @@ def update_crypto_prices():
 
 def _update_from_coingecko():
     try:
-        api_config = CRYPTO_APIS["coingecko"]
-        response = requests.get(api_config["url"], params=api_config["params"], headers=api_config["headers"], timeout=15)
-        if response.status_code == 429:
-            logger.warning("CoinGecko rate limit exceeded.")
-            return False
-        response.raise_for_status()
-        prices = response.json()
-        current_time = datetime.now()
-        for symbol, coin_id in CRYPTO_IDS.items():
-            if coin_id in prices:
-                crypto_prices[symbol].update(price=prices[coin_id].get("usd"), change=prices[coin_id].get("usd_24h_change"), last_update=current_time, source="coingecko")
+        r = requests.get(CRYPTO_APIS["coingecko"]["url"], params=CRYPTO_APIS["coingecko"]["params"], headers=CRYPTO_APIS["coingecko"]["headers"], timeout=15)
+        if r.status_code == 429: return False
+        r.raise_for_status()
+        prices = r.json()
+        t = datetime.now()
+        for s, cid in CRYPTO_IDS.items():
+            if cid in prices: crypto_prices[s].update(price=prices[cid].get("usd"), change=prices[cid].get("usd_24h_change"), last_update=t, source="coingecko")
         return True
     except Exception as e:
         logger.error(f"CoinGecko API error: {e}")
@@ -273,19 +265,14 @@ def _update_from_coingecko():
 
 def _update_from_binance():
     try:
-        api_config = CRYPTO_APIS["binance"]
-        current_time = datetime.now()
-        for symbol_pair in api_config["symbols"]:
-            response = requests.get(f"{api_config['url']}?symbol={symbol_pair}", timeout=10)
-            if response.status_code == 429:
-                logger.warning("Binance rate limit exceeded.")
-                return False
-            response.raise_for_status()
-            data = response.json()
-            symbol_map = {"BTCUSDT": "btc", "ETHUSDT": "eth", "TONUSDT": "ton"}
-            our_symbol = symbol_map.get(symbol_pair)
-            if our_symbol:
-                crypto_prices[our_symbol].update(price=float(data.get("lastPrice", 0)), change=float(data.get("priceChangePercent", 0)), last_update=current_time, source="binance")
+        t = datetime.now()
+        for sp in CRYPTO_APIS["binance"]["symbols"]:
+            r = requests.get(f"{CRYPTO_APIS['binance']['url']}?symbol={sp}", timeout=10)
+            if r.status_code == 429: return False
+            r.raise_for_status()
+            d = r.json()
+            s = {"BTCUSDT": "btc", "ETHUSDT": "eth", "TONUSDT": "ton"}.get(sp)
+            if s: crypto_prices[s].update(price=float(d.get("lastPrice",0)), change=float(d.get("priceChangePercent",0)), last_update=t, source="binance")
         return True
     except Exception as e:
         logger.error(f"Binance API error: {e}")
@@ -293,19 +280,14 @@ def _update_from_binance():
 
 def _update_from_cryptocompare():
     try:
-        api_config = CRYPTO_APIS["cryptocompare"]
-        response = requests.get(api_config["url"], params=api_config["params"], timeout=15)
-        if response.status_code == 429:
-            logger.warning("CryptoCompare rate limit exceeded.")
-            return False
-        response.raise_for_status()
-        data = response.json().get("RAW", {})
-        current_time = datetime.now()
-        symbol_map = {"BTC": "btc", "ETH": "eth", "TON": "ton"}
-        for api_symbol, our_symbol in symbol_map.items():
-            if api_symbol in data and "USD" in data[api_symbol]:
-                usd_data = data[api_symbol]["USD"]
-                crypto_prices[our_symbol].update(price=usd_data.get("PRICE", 0), change=usd_data.get("CHANGEPCT24HOUR", 0), last_update=current_time, source="cryptocompare")
+        r = requests.get(CRYPTO_APIS["cryptocompare"]["url"], params=CRYPTO_APIS["cryptocompare"]["params"], timeout=15)
+        if r.status_code == 429: return False
+        r.raise_for_status()
+        raw = r.json().get("RAW", {})
+        t = datetime.now()
+        for s_api, s_our in {"BTC": "btc", "ETH": "eth", "TON": "ton"}.items():
+            if s_api in raw and "USD" in raw[s_api]:
+                crypto_prices[s_our].update(price=raw[s_api]["USD"].get("PRICE", 0), change=raw[s_api]["USD"].get("CHANGEPCT24HOUR", 0), last_update=t, source="cryptocompare")
         return True
     except Exception as e:
         logger.error(f"CryptoCompare API error: {e}")
@@ -317,55 +299,32 @@ def _switch_api_source():
     api_cache["current_source"] = sources[(current_index + 1) % len(sources)]
 
 def _use_fallback_data():
-    current_time = datetime.now()
-    for symbol, data in FALLBACK_DATA.items():
-        crypto_prices[symbol].update(last_update=current_time, **data)
+    t = datetime.now()
+    for s, d in FALLBACK_DATA.items(): crypto_prices[s].update(last_update=t, **d)
     logger.info("Using fallback crypto data.")
 
-def format_change_bar(percent_change):
-    if percent_change is None: return "N/A", ""
-    bar_length = 10
-    filled = min(int(abs(percent_change) * bar_length / 10), bar_length)
-    bar = "▰" * filled + "▱" * (bar_length - filled)
-    symbol = "▲" if percent_change >= 0 else "▼"
-    color = "🟢" if percent_change >= 0 else "🔴"
-    return f"{color} {symbol}{abs(percent_change):.1f}%", bar
+def format_change_bar(p):
+    if p is None: return "N/A", ""
+    bar = "▰" * min(int(abs(p) * 10 / 10), 10) + "▱" * (10 - min(int(abs(p) * 10 / 10), 10))
+    return f"{'🟢' if p >= 0 else '🔴'} {'▲' if p >= 0 else '▼'}{abs(p):.1f}%", bar
 
 def main_menu_keyboard(lang: str):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("horoscope_button", lang), callback_data="horoscope_menu")],
-        [InlineKeyboardButton(get_text("tip_button", lang), callback_data="learning_tip"), InlineKeyboardButton(get_text("settings_button", lang), callback_data="settings_menu")],
-        [InlineKeyboardButton(get_text("premium_button", lang), callback_data="premium_menu")]
-    ])
-
+    return InlineKeyboardMarkup([[InlineKeyboardButton(get_text("horoscope_button", lang), callback_data="horoscope_menu")],[InlineKeyboardButton(get_text("tip_button", lang), callback_data="learning_tip"), InlineKeyboardButton(get_text("settings_button", lang), callback_data="settings_menu")],[InlineKeyboardButton(get_text("premium_button", lang), callback_data="premium_menu")]])
 def back_to_menu_keyboard(lang: str):
     return InlineKeyboardMarkup([[InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]])
-
 def main_menu_text_keyboard(lang: str):
     return InlineKeyboardMarkup([[InlineKeyboardButton(get_text("main_menu_text_button", lang), callback_data="main_menu")]])
-
 def back_to_premium_menu_keyboard(lang: str):
     return InlineKeyboardMarkup([[InlineKeyboardButton(get_text("back_button", lang), callback_data="premium_menu")]])
-
 def zodiac_keyboard(lang: str):
-    zodiacs, original_zodiacs = ZODIAC_SIGNS[lang], ZODIAC_SIGNS["ru"]
-    buttons = [
-        [InlineKeyboardButton(zod, callback_data=f"zodiac_{orig_zod}") for zod, orig_zod in zip(zodiacs[i:i+3], original_zodiacs[i:i+3])]
-        for i in range(0, len(zodiacs), 3)
-    ]
-    buttons.append([InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")])
-    return InlineKeyboardMarkup(buttons)
-
+    z, o = ZODIAC_SIGNS[lang], ZODIAC_SIGNS["ru"]
+    btns = [[InlineKeyboardButton(zod, callback_data=f"zodiac_{orig_zod}") for zod, orig_zod in zip(z[i:i+3], o[i:i+3])] for i in range(0, len(z), 3)]
+    btns.append([InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")])
+    return InlineKeyboardMarkup(btns)
 def settings_keyboard(chat_id: int, lang: str):
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info"), InlineKeyboardButton(get_text("support_button", lang), callback_data="support_info")],
-        [InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],
-        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
-    ])
-
+    return InlineKeyboardMarkup([[InlineKeyboardButton(get_text("commands_button", lang), callback_data="commands_info"), InlineKeyboardButton(get_text("support_button", lang), callback_data="support_info")],[InlineKeyboardButton(get_text("change_language_button", lang), callback_data="change_language")],[InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]])
 def back_to_settings_keyboard(lang: str):
     return InlineKeyboardMarkup([[InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="settings_menu")]])
-
 def language_keyboard():
     return InlineKeyboardMarkup([[InlineKeyboardButton("🇷🇺 Русский", callback_data="set_lang_ru"), InlineKeyboardButton("🇬🇧 English", callback_data="set_lang_en"), InlineKeyboardButton("🇨🇳 中文", callback_data="set_lang_zh")]])
 
@@ -388,7 +347,7 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         user_info["is_new_user"] = False
         lang = user_info["language"]
         agreement_link = f'[{escape_markdown(get_text("user_agreement_link_text", lang), 2)}]({get_text("user_agreement_url", lang)})'
-        welcome_text = get_text("welcome", lang).format(first_name=escape_markdown(user.first_name, 2), user_agreement=agreement_link)
+        welcome_text = escape_markdown(get_text("welcome", lang), 2).replace(escape_markdown('{first_name}', 2), escape_markdown(user.first_name, 2)).replace(escape_markdown('{user_agreement}', 2), agreement_link)
         await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
     else:
         await show_main_menu(update, context)
@@ -407,7 +366,8 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if query:
             await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
         else:
-            welcome_back_text = get_text("welcome_back", lang).format(first_name=escape_markdown(update.effective_user.first_name, 2))
+            welcome_back_raw = get_text("welcome_back", lang)
+            welcome_back_text = welcome_back_raw.format(first_name=escape_markdown(update.effective_user.first_name, 2))
             full_text = f"*{escape_markdown(welcome_back_text, 2)}*\n\n{prompt}"
             await context.bot.send_message(chat_id=chat_id, text=full_text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
     except BadRequest as e:
@@ -429,27 +389,24 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     current_date = escape_markdown(datetime.now().strftime("%d.%m.%Y"), 2)
     display_zodiac = ZODIAC_CALLBACK_MAP.get(lang, {}).get(zodiac, zodiac) if lang != "ru" else zodiac
     horoscope_text = get_text('horoscope_unavailable', lang)
-    if horoscope_index := get_user_data(chat_id)["horoscope_indices"].get(zodiac):
+    if (horoscope_indices := get_user_data(chat_id).get("horoscope_indices")) and (horoscope_index := horoscope_indices.get(zodiac)) is not None:
         horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index]
     market_data_items = []
-    last_update_time = "N/A"
-    last_update_source_emoji = "❓"
+    last_update_time, last_update_source_emoji = "N/A", "❓"
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data.get("price") is not None and price_data.get("change") is not None:
             change_text, bar = format_change_bar(price_data["change"])
-            market_data_items.append(f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}")
+            market_data_items.append(f"{escape_markdown(symbol.upper(), 2)}: ${escape_markdown(f'{price_data["price"]:,.2f}', 2)} {escape_markdown(change_text, 2)} \\(24h\\)\n{bar}")
             if price_data["last_update"]:
-                last_update_time = price_data["last_update"].strftime("%H:%M")
-                last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
+                last_update_time, last_update_source_emoji = price_data["last_update"].strftime("%H:%M"), {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
     market_data_str = "\n\n".join(market_data_items)
     update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
-    market_title = get_text('market_rates_title', lang)
-    content_to_quote = f"{escape_markdown(horoscope_text, 2)}\n{escape_markdown('━━━━━━━━━━━━━━━━━━━', 2)}\n*{escape_markdown(market_title, 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
-    quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
+    content_to_quote = f"*{escape_markdown(get_text('market_rates_title', lang), 2)}*\n{market_data_str}\n\n{update_line}"
+    quoted_content = "\n".join([f"> {escape_markdown(line, 2)}" for line in content_to_quote.splitlines()])
     disclaimer_text = get_text("horoscope_disclaimer", lang)
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
-    text = f"*{emoji} {escape_markdown(display_zodiac, 2)} | {current_date}*\n\n{quoted_content}\n\n_{escape_markdown(disclaimer_text, 2)}_"
+    text = f"*{emoji} {escape_markdown(display_zodiac, 2)} | {current_date}*\n\n> {escape_markdown(horoscope_text, 2)}\n\n{quoted_content}\n\n_{escape_markdown(disclaimer_text, 2)}_"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=main_menu_text_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -468,7 +425,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     title = get_text('settings_title', lang)
     description = get_text('settings_menu_description', lang)
-    text = f"*{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)}"
+    text = f"*{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)} 🛠️"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=settings_keyboard(chat_id, lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -479,36 +436,29 @@ async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 def load_broadcast_chats():
     try:
-        with open("broadcast_chats.json", "r") as f:
-            return json.load(f).get("broadcast_chat_ids", [])
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+        with open("broadcast_chats.json", "r") as f: return json.load(f).get("broadcast_chat_ids", [])
+    except (FileNotFoundError, json.JSONDecodeError): return []
 
 def save_broadcast_chats(chat_ids):
     try:
-        with open("broadcast_chats.json", "w") as f:
-            json.dump({"broadcast_chat_ids": chat_ids}, f, indent=4)
+        with open("broadcast_chats.json", "w") as f: json.dump({"broadcast_chat_ids": chat_ids}, f, indent=4)
     except Exception as e:
         logger.error(f"Error saving broadcast_chats.json: {e}")
 
 async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.my_chat_member.new_chat_member.user.id == context.bot.id:
-        chat_id = update.my_chat_member.chat.id
-        chat_ids = load_broadcast_chats()
+        chat_id, chat_ids = update.my_chat_member.chat.id, load_broadcast_chats()
         if update.my_chat_member.new_chat_member.status in ["member", "administrator"] and chat_id not in chat_ids:
             chat_ids.append(chat_id)
-            logger.info(f"Bot added to chat {chat_id}. Updating broadcast list.")
             save_broadcast_chats(chat_ids)
         elif update.my_chat_member.new_chat_member.status in ["left", "kicked"] and chat_id in chat_ids:
             chat_ids.remove(chat_id)
-            logger.info(f"Bot removed from chat {chat_id}. Updating broadcast list.")
             save_broadcast_chats(chat_ids)
 
 def format_daily_summary(lang: str) -> str:
     horoscopes = {}
-    zodiac_signs_ru = ZODIAC_SIGNS["ru"]
     ru_to_lang_map = ZODIAC_CALLBACK_MAP.get(lang, {})
-    for sign_ru in zodiac_signs_ru:
+    for sign_ru in ZODIAC_SIGNS["ru"]:
         sign_lang = ru_to_lang_map.get(sign_ru, sign_ru)
         horoscope_index = random.randint(0, len(HOROSCOPES_DB["ru"][sign_ru]) - 1)
         horoscopes[sign_lang] = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
@@ -516,42 +466,37 @@ def format_daily_summary(lang: str) -> str:
     horoscope_section = "\n\n".join(horoscopes.values())
     update_crypto_prices()
     market_data_items = []
-    last_update_time = "N/A"
-    last_update_source_emoji = "❓"
+    last_update_time, last_update_source_emoji = "N/A", "❓"
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data.get("price") is not None and price_data.get("change") is not None:
             change_text, bar = format_change_bar(price_data["change"])
-            market_data_items.append(f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}")
+            market_data_items.append(f"{escape_markdown(symbol.upper(), 2)}: ${escape_markdown(f'{price_data["price"]:,.2f}', 2)} {escape_markdown(change_text, 2)} \\(24h\\)\n{bar}")
             if price_data["last_update"]:
-                last_update_time = price_data["last_update"].strftime("%H:%M")
-                last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
+                last_update_time, last_update_source_emoji = price_data["last_update"].strftime("%H:%M"), {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
     market_data_str = "\n\n".join(market_data_items)
     update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
-    market_title = get_text('market_rates_title', lang)
-    content_to_quote = f"{escape_markdown(horoscope_section, 2)}\n{escape_markdown('━━━━━━━━━━━━━━━━━━━', 2)}\n*{escape_markdown(market_title, 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
+    content_to_quote = f"{escape_markdown(horoscope_section, 2)}\n\n*{escape_markdown(get_text('market_rates_title', lang), 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
     quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
     title = get_text('astro_command_title', lang)
     return f"🌌 *{escape_markdown(title, 2)}* | {current_date}\n\n{quoted_content}"
 
 async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     update_user_horoscope(update.message.chat_id)
-    lang = get_user_lang(update.message.chat_id)
-    await update.message.reply_text(format_daily_summary(lang), parse_mode=ParseMode.MARKDOWN_V2)
+    await update.message.reply_text(format_daily_summary(get_user_lang(update.message.chat_id)), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id, lang = update.message.chat_id, get_user_lang(update.message.chat_id)
     update_user_horoscope(chat_id)
     tip_index = get_user_data(chat_id).get("tip_index")
-    tip_text = TEXTS["learning_tips"][lang][tip_index] if tip_index is not None else TEXTS["learning_tips"][lang][0]
+    tip_text = TEXTS["learning_tips"][lang][tip_index or 0]
     title = get_text('tip_of_the_day_title', lang)
     text = f"*{escape_markdown(title, 2)}*\n\n> 🌟 {escape_markdown(tip_text, 2)}"
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Starting daily broadcast job...")
-    chat_ids = load_broadcast_chats()
-    if not chat_ids:
+    if not (chat_ids := load_broadcast_chats()):
         logger.info("No broadcast chats to send to.")
         return
     full_message = format_daily_summary(lang="ru")
@@ -576,17 +521,15 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     title = get_text('premium_menu_title', lang)
     description = get_text('premium_menu_description', lang)
-    text = f"*{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)}"
+    text = f"*{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)} 🙏"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=premium_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def support_with_stars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
-    payload = "astrokit-support-stars-15"
     title, description = get_text("stars_invoice_title", lang), get_text("stars_invoice_description", lang)
-    prices = [LabeledPrice("15 ⭐️", 15)]
-    await context.bot.send_invoice(chat_id=chat_id, title=title, description=description, payload=payload, provider_token="", currency="XTR", prices=prices)
+    await context.bot.send_invoice(chat_id=chat_id, title=title, description=description, payload="astrokit-support-stars-15", provider_token="", currency="XTR", prices=[LabeledPrice("15 ⭐️", 15)])
 
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.pre_checkout_query
@@ -602,7 +545,7 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     title = get_text("commands_info_title", lang)
     support_link = f'[{escape_markdown(get_text("support_link_text", lang), 2)}]({get_text("support_url", lang)})'
     body = get_text("commands_info_body", lang).format(support_link=support_link)
-    quoted_body = "\n".join([f"> {line}" for line in escape_markdown(body, 2).splitlines()])
+    quoted_body = "\n".join([f"> {line}" for line in escape_markdown(body, 2).replace(escape_markdown(support_link, 2), support_link).splitlines()])
     text = f"*{escape_markdown(title, 2)}*\n\n{quoted_body}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=back_to_settings_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -612,7 +555,7 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     support_link = f'[{escape_markdown(get_text("support_link_text", lang), 2)}]({get_text("support_url", lang)})'
     info_text = get_text("support_info_text", lang).format(support_link=support_link)
-    quoted_text = f"> {escape_markdown(info_text, 2)}"
+    quoted_text = f"> {escape_markdown(info_text, 2).replace(escape_markdown(support_link, 2), support_link)}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=quoted_text, reply_markup=back_to_settings_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -655,11 +598,10 @@ def keep_alive():
             time.sleep(60)
             continue
         try:
-            response = requests.get(f"{server_url}/health", timeout=30)
-            logger.info(f"✅ Keep-alive to {server_url}/health successful." if response.status_code == 200 else f"⚠️ Keep-alive to {server_url}/health returned status {response.status_code}")
+            r = requests.get(f"{server_url}/health", timeout=30)
+            logger.info(f"✅ Keep-alive successful." if r.status_code == 200 else f"⚠️ Keep-alive returned status {r.status_code}")
         except requests.exceptions.RequestException as e:
-            logger.error(f"❌ Keep-alive ping to {server_url}/health failed: {e}")
-        logger.info("...keep-alive thread sleeping for 14 minutes...")
+            logger.error(f"❌ Keep-alive ping failed: {e}")
         time.sleep(14 * 60)
 
 def main() -> None:
@@ -674,7 +616,6 @@ def main() -> None:
     threading.Thread(target=run_flask_server, name="FlaskServer", daemon=True).start()
     if os.environ.get('RENDER'):
         threading.Thread(target=keep_alive, name="KeepAlive", daemon=True).start()
-        logger.info("🔔 Keep-alive активирован (интервал: 14 минут)")
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("astro", astro_command, filters=filters.ALL))

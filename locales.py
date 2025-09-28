@@ -253,9 +253,9 @@ TEXTS = {
         "zh": "加密星座运势"
     },
     "commands_info_title": {
-        "ru": "ℹ️ Доступные команды:",
-        "en": "ℹ️ Available commands:",
-        "zh": "ℹ️ 可用命令:"
+        "ru": "Доступные команды:",
+        "en": "Available commands:",
+        "zh": "可用命令:"
     },
     "commands_info_body": {
         "ru": "AstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня\n\nДля настройки бота в вашем чате обратитесь в {support_link}.",
