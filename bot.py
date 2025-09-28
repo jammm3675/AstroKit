@@ -649,14 +649,8 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     update_user_horoscope(chat_id)
     update_crypto_prices()
     
-    raw_text = get_text("main_menu_title", lang)
-    parts = raw_text.split('\n\n', 1)
-    title = parts[0]
-    description = ""
-    if len(parts) > 1:
-        # Ensure every line in the description is quoted
-        description = "> " + parts[1].replace('\n', '\n> ')
-    text = f"{title}\n\n{description}"
+    # Use a generic title for the main menu
+    text = get_text("main_menu_title", lang)
     
     try:
         if query:
@@ -690,15 +684,11 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     update_user_horoscope(chat_id)
     
-    text = get_text("zodiac_select_title", lang)
-    # Ensure every line in the description is quoted
-    quoted_text = "> " + text.replace('\n', '\n> ')
-
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=quoted_text,
+            text=get_text("zodiac_select_title", lang),
             reply_markup=zodiac_keyboard(lang),
             parse_mode="Markdown"
         )
@@ -706,65 +696,53 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
         logger.error(f"Error showing horoscope menu: {e}")
 
 async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TYPE, zodiac: str) -> None:
-    """Shows the horoscope for the selected zodiac sign with corrected formatting."""
+    """Shows the horoscope for the selected zodiac sign."""
     query = update.callback_query
     await query.answer()
-
+    
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
-
+    
     update_crypto_prices()
-
+    
     current_date = datetime.now().strftime("%d.%m.%Y")
-
-    # --- Build Market Data Block ---
-    market_data_lines = []
-    for symbol in ["btc", "eth", "ton"]:
-        price_data = crypto_prices.get(symbol)
-        if price_data and price_data["price"] is not None and price_data["change"] is not None:
+    
+    # Get market data text
+    market_text = get_text("market_rates_title", lang)
+    for symbol in CRYPTO_IDS:
+        price_data = crypto_prices[symbol]
+        if price_data["price"] is not None and price_data["change"] is not None:
             change_text, bar = format_change_bar(price_data["change"])
-            market_data_lines.append(f"> {symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)")
-            market_data_lines.append(f"> {bar}")
-            # Add a spacer line unless it's the last item
-            if symbol != 'ton':
-                market_data_lines.append(">")
+            last_update = price_data["last_update"].strftime("%H:%M") if price_data["last_update"] else "N/A"
+            source = price_data.get("source", "unknown")
+            source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n{get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
 
-    # --- Add Single Update Line ---
-    ton_price_data = crypto_prices.get("ton")
-    if ton_price_data and ton_price_data["last_update"]:
-        last_update = ton_price_data["last_update"].strftime("%H:%M")
-        source = ton_price_data.get("source", "unknown")
-        source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
-        update_word = "Обновление" # Keep the RU word as requested
-        market_data_lines.append(f"> {update_word}: {last_update} {source_emoji}")
-
-    market_text = "\n".join(market_data_lines)
-
-    # --- Get Horoscope and Disclaimer ---
+    # Get the translated zodiac sign name for display
     display_zodiac = zodiac
     if lang != "ru":
         display_zodiac = ZODIAC_CALLBACK_MAP.get(lang, {}).get(zodiac, zodiac)
 
+
+    # Get the horoscope text using the stored index for the user
     user_info = get_user_data(chat_id)
     horoscope_index = user_info["horoscope_indices"].get(zodiac)
-    horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index] if horoscope_index is not None else get_text('horoscope_unavailable', lang)
 
-    # Quote the horoscope and disclaimer texts
-    quoted_horoscope = "> " + horoscope_text.replace('\n', '\n> ')
-    disclaimer_text = get_text("horoscope_disclaimer", lang).strip().replace("\n\n", "")
-    quoted_disclaimer = "> " + disclaimer_text.replace('\n', '\n> ')
+    if horoscope_index is not None:
+        horoscope_text = HOROSCOPES_DB[lang][display_zodiac][horoscope_index]
+    else:
+        horoscope_text = get_text('horoscope_unavailable', lang)
 
+    disclaimer_text = get_text("horoscope_disclaimer", lang)
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
-
-    # --- Assemble Final Message ---
     text = (
         f"*{emoji} {display_zodiac} | {current_date}*\n\n"
-        f"{quoted_horoscope}\n"
-        f"> ━━━━━━━━━━━━━━━━━━━\n"
-        f"{market_text}\n"
-        f"{quoted_disclaimer}"
+        f"{horoscope_text}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"{market_text}"
+        f"{disclaimer_text}"
     )
-
+    
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -793,10 +771,8 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         tip_text = get_text('horoscope_unavailable', lang) # Re-using a generic error message
 
-    tip_body = f"🌟 {tip_text}"
-    quoted_tip = "> " + tip_body.replace('\n', '\n> ')
-    text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{quoted_tip}"
-
+    text = f" *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -815,12 +791,9 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
     
-    description = get_text('settings_menu_description', lang)
-    # Ensure every line in the description is quoted
-    quoted_description = "> " + description.replace('\n', '\n> ')
     text = (
         f"*{get_text('settings_title', lang)}*\n\n"
-        f"{quoted_description}"
+        f"{get_text('settings_menu_description', lang)}"
     )
     
     try:
@@ -834,6 +807,172 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except BadRequest as e:
         logger.error(f"Error showing settings menu: {e}")
 
+async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Shows the language selection menu."""
+    query = update.callback_query
+    await query.answer()
+
+    lang_prompt = (
+        f"🇷🇺 {get_text('language_select', 'ru')} / "
+        f"🇬🇧 {get_text('language_select', 'en')} / "
+        f"🇨🇳 {get_text('language_select', 'zh')}"
+    )
+    await context.bot.edit_message_text(
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id,
+        text=lang_prompt,
+        reply_markup=language_keyboard()
+    )
+
+# --- Channel Broadcast Feature ---
+
+def load_broadcast_chats():
+    """Loads the list of broadcast chat IDs from a JSON file."""
+    try:
+        with open("broadcast_chats.json", "r") as f:
+            data = json.load(f)
+            return data.get("broadcast_chat_ids", [])
+    except FileNotFoundError:
+        logger.warning("broadcast_chats.json not found. Creating a new one.")
+        with open("broadcast_chats.json", "w") as f:
+            json.dump({"broadcast_chat_ids": []}, f)
+        return []
+    except Exception as e:
+        logger.error(f"Error loading broadcast_chats.json: {e}")
+        return []
+
+def save_broadcast_chats(chat_ids):
+    """Saves the list of broadcast chat IDs to a JSON file."""
+    try:
+        with open("broadcast_chats.json", "w") as f:
+            json.dump({"broadcast_chat_ids": chat_ids}, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving broadcast_chats.json: {e}")
+
+async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handles the bot being added to a new chat."""
+    if update.my_chat_member.new_chat_member.user.id == context.bot.id:
+        chat_id = update.my_chat_member.chat.id
+        if update.my_chat_member.new_chat_member.status in ["member", "administrator"]:
+            logger.info(f"Bot was added to chat {chat_id}. Adding to broadcast list.")
+            chat_ids = load_broadcast_chats()
+            if chat_id not in chat_ids:
+                chat_ids.append(chat_id)
+                save_broadcast_chats(chat_ids)
+        elif update.my_chat_member.new_chat_member.status in ["left", "kicked"]:
+            logger.info(f"Bot was removed from chat {chat_id}. Removing from broadcast list.")
+            chat_ids = load_broadcast_chats()
+            if chat_id in chat_ids:
+                chat_ids.remove(chat_id)
+                save_broadcast_chats(chat_ids)
+
+def format_daily_summary(lang: str) -> str:
+    """Formats the full daily summary message in the specified language."""
+    # Generate a fresh set of unique horoscopes for the broadcast
+    horoscopes = {}
+    zodiac_signs_lang = ZODIAC_SIGNS[lang]
+    zodiac_signs_ru = ZODIAC_SIGNS["ru"]
+
+    # Ensure each sign gets a unique horoscope for the day
+    horoscope_indices = {sign: random.randint(0, 29) for sign in zodiac_signs_ru}
+
+    # Create a map from Russian sign names to the localized names
+    ru_to_lang_map = ZODIAC_CALLBACK_MAP.get(lang, {})
+
+    for sign_ru in zodiac_signs_ru:
+        sign_lang = ru_to_lang_map.get(sign_ru, sign_ru)
+
+        # Get a random, unique horoscope for the day's broadcast
+        horoscope_index = horoscope_indices[sign_ru]
+        horoscope_text = HOROSCOPES_DB[lang][sign_lang][horoscope_index]
+        horoscopes[sign_lang] = horoscope_text
+
+
+    # Format the horoscope section
+    current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
+    horoscope_section = "\n\n".join(horoscopes.values())
+
+    # Update and format market data
+    update_crypto_prices()
+    market_text = f"*{get_text('market_rates_title', lang)}*\n"
+    for symbol in CRYPTO_IDS:
+        price_data = crypto_prices[symbol]
+        if price_data["price"] is not None and price_data["change"] is not None:
+            change_text, bar = format_change_bar(price_data["change"])
+            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n"
+
+    title = get_text('astro_command_title', lang)
+    return (
+        f"🌌 *{title} | {current_date}*\n\n"
+        f"{horoscope_section}\n\n"
+        f"{market_text}"
+    )
+
+async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for the /astro command."""
+    update_user_horoscope(update.message.chat_id)
+    lang = get_user_lang(update.message.chat_id)
+    full_message = format_daily_summary(lang)
+    await update.message.reply_text(full_message, parse_mode="Markdown")
+
+
+async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handler for the /day command."""
+    chat_id = update.message.chat_id
+    update_user_horoscope(chat_id)
+    lang = get_user_lang(chat_id)
+
+    # Get the tip of the day using the stored index for the user
+    user_info = get_user_data(chat_id)
+    tip_index = user_info.get("tip_index")
+
+    if tip_index is not None:
+        tip_text = TEXTS["learning_tips"][lang][tip_index]
+    else:
+        # If no tip is set (e.g., a user from before the update), show an error or a default.
+        # For now, let's just show the first tip.
+        tip_text = TEXTS["learning_tips"][lang][0]
+
+    text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{tip_text}"
+    await update.message.reply_text(text, parse_mode="Markdown")
+
+
+async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to broadcast the daily summary to all subscribed channels."""
+    logger.info("Starting daily broadcast job...")
+    chat_ids = load_broadcast_chats()
+    if not chat_ids:
+        logger.info("No broadcast chats to send to.")
+        return
+
+    full_message = format_daily_summary(lang="ru") # Broadcasts are in Russian by default
+    for chat_id in chat_ids:
+        try:
+            await context.bot.send_message(chat_id=chat_id, text=full_message, parse_mode="Markdown")
+            logger.info(f"Successfully broadcasted to chat {chat_id}")
+        except Exception as e:
+            logger.error(f"Failed to broadcast to chat {chat_id}: {e}")
+    logger.info("Daily broadcast job finished.")
+
+
+def premium_menu_keyboard(lang: str):
+    """Creates the support/premium menu keyboard."""
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                get_text("premium_button_ton", lang),
+                url="ton://transfer/UQChLGkeg_x4p4aQ6C11oXDnR4DLc4LsF8YaX2JIEYB_Gvw_?amount=100000000&text=Support(Поддержать)"
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                get_text("premium_button_stars", lang),
+                callback_data="support_stars"
+            )
+        ],
+        [InlineKeyboardButton(get_text("main_menu_button", lang), callback_data="main_menu")]
+    ])
+
 async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Shows the premium menu with support options."""
     query = update.callback_query
@@ -842,12 +981,9 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    description = get_text('premium_menu_description', lang)
-    # Ensure every line in the description is quoted
-    quoted_description = "> " + description.replace('\n', '\n> ')
     text = (
         f"*{get_text('premium_menu_title', lang)}*\n\n"
-        f"{quoted_description}"
+        f"{get_text('premium_menu_description', lang)}"
     )
     
     try:
