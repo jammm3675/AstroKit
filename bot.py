@@ -619,23 +619,36 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = query.from_user
     chat_id = query.message.chat_id
     user_info = get_user_data(chat_id)
-    lang = query.data.split("_")[-1]  # 'ru' or 'en'
+    lang = query.data.split("_")[-1]
     user_info["language"] = lang
 
-    # If user is new, show full welcome message and set flag to false
     if user_info.get("is_new_user"):
         user_info["is_new_user"] = False
-        welcome_text = get_text("welcome", lang).format(first_name=user.first_name)
+
+        agreement_link_text = get_text("user_agreement_link_text", lang)
+        agreement_url = get_text("user_agreement_url", lang)
+        agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
+
+        welcome_template = get_text("welcome", lang)
+
+        # Escape the template first, then replace the placeholder with the pre-formatted link
+        welcome_text = escape_markdown(welcome_template, 2).replace(
+            escape_markdown('{user_agreement}', 2),
+            agreement_link
+        )
+
+        # Now, format the rest of the placeholders like first_name
+        final_text = welcome_text.format(first_name=escape_markdown(user.first_name, 2))
+
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=welcome_text,
+            text=final_text,
             reply_markup=main_menu_keyboard(lang),
-            parse_mode="Markdown",
+            parse_mode=ParseMode.MARKDOWN_V2,
             disable_web_page_preview=True
         )
     else:
-        # If user is just changing language, show the main menu
         await show_main_menu(update, context)
 
 
@@ -780,23 +793,31 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
         logger.error(f"Error showing zodiac horoscope with MarkdownV2: {e}")
 
 async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Shows the tip of the day."""
+    """Shows the tip of the day using MarkdownV2."""
     query = update.callback_query
     await query.answer()
 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    # Get the tip of the day using the stored index for the user
     user_info = get_user_data(chat_id)
     tip_index = user_info.get("tip_index")
 
-    if tip_index is not None:
-        tip_text = TEXTS["learning_tips"][lang][tip_index]
-    else:
-        tip_text = get_text('horoscope_unavailable', lang) # Re-using a generic error message
+    tip_text_raw = get_text('horoscope_unavailable', lang)
+    if tip_index is not None and tip_index < len(TEXTS["learning_tips"][lang]):
+        tip_text_raw = TEXTS["learning_tips"][lang][tip_index]
 
-    text = f" *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
+    title_raw = get_text('tip_of_the_day_title', lang)
+    title_md = f"💡 *{escape_markdown(title_raw, 2)}*"
+
+    # The tip text now includes an emoji, which doesn't need escaping.
+    # We split the emoji from the text to escape only the text part.
+    emoji, _, tip_body = tip_text_raw.partition(' ')
+    escaped_tip_body = escape_markdown(tip_body, 2)
+
+    quoted_tip = f"> {emoji} {escaped_tip_body}"
+
+    text = f"{title_md}\n\n{quoted_tip}"
 
     try:
         await context.bot.edit_message_text(
@@ -804,7 +825,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             message_id=query.message.message_id,
             text=text,
             reply_markup=back_to_menu_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing learning tip: {e}")
@@ -963,24 +984,29 @@ async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 
 
 async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handler for the /day command."""
+    """Handler for the /day command that shows the tip of the day."""
     chat_id = update.message.chat_id
     update_user_horoscope(chat_id)
     lang = get_user_lang(chat_id)
 
-    # Get the tip of the day using the stored index for the user
     user_info = get_user_data(chat_id)
     tip_index = user_info.get("tip_index")
 
-    if tip_index is not None:
-        tip_text = TEXTS["learning_tips"][lang][tip_index]
-    else:
-        # If no tip is set (e.g., a user from before the update), show an error or a default.
-        # For now, let's just show the first tip.
-        tip_text = TEXTS["learning_tips"][lang][0]
+    tip_text_raw = get_text('horoscope_unavailable', lang)
+    if tip_index is not None and tip_index < len(TEXTS["learning_tips"][lang]):
+        tip_text_raw = TEXTS["learning_tips"][lang][tip_index]
 
-    text = f"*{get_text('tip_of_the_day_title', lang)}*\n\n{tip_text}"
-    await update.message.reply_text(text, parse_mode="Markdown")
+    title_raw = get_text('tip_of_the_day_title', lang)
+    title_md = f"💡 *{escape_markdown(title_raw, 2)}*"
+
+    emoji, _, tip_body = tip_text_raw.partition(' ')
+    escaped_tip_body = escape_markdown(tip_body, 2)
+
+    quoted_tip = f"> {emoji} {escaped_tip_body}"
+
+    text = f"{title_md}\n\n{quoted_tip}"
+
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
@@ -1079,14 +1105,30 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer(ok=True)
 
 async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Displays the list of available commands."""
+    """Displays the list of available commands using MarkdownV2."""
     query = update.callback_query
     await query.answer()
 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    text = get_text("commands_info_text", lang)
+    title_raw = get_text("commands_info_title", lang)
+    title_md = f"🤖 *{escape_markdown(title_raw, 2)}*"
+
+    support_link_text = get_text("support_link_text", lang)
+    support_url = get_text("support_url", lang)
+    support_link = f'[{escape_markdown(support_link_text, 2)}]({support_url})'
+
+    body_template = get_text("commands_info_body", lang)
+
+    body_with_link = escape_markdown(body_template, 2).replace(
+        escape_markdown('{support_link}', 2),
+        support_link
+    )
+
+    quoted_body = "\n".join([f"> {line}" for line in body_with_link.splitlines()])
+
+    text = f"{title_md}\n\n{quoted_body}"
 
     try:
         await context.bot.edit_message_text(
@@ -1094,7 +1136,8 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
             message_id=query.message.message_id,
             text=text,
             reply_markup=back_to_settings_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2,
+            disable_web_page_preview=True
         )
     except BadRequest as e:
         logger.error(f"Error showing commands info: {e}")
