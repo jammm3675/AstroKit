@@ -634,17 +634,11 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         escaped_first_name = escape_markdown(user.first_name, 2)
         agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
 
-        # Split the template to isolate placeholders and escape parts safely
-        parts = welcome_template.split('{first_name}')
-        sub_parts = parts[1].split('{user_agreement}')
-
-        # Assemble the final text, ensuring only static parts are escaped
-        final_text = (
-            escape_markdown(parts[0], 2) +
-            escaped_first_name +
-            escape_markdown(sub_parts[0], 2) +
-            agreement_link +
-            escape_markdown(sub_parts[1], 2)
+        # The template from locales.py now contains the necessary Markdown.
+        # We just format it with the escaped/safe values.
+        final_text = welcome_template.format(
+            first_name=escaped_first_name,
+            user_agreement=agreement_link
         )
 
         await context.bot.edit_message_text(
@@ -712,12 +706,14 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     update_user_horoscope(chat_id)
 
     try:
+        title_raw = get_text("zodiac_select_title", lang)
+        title_md = f"🔮 ***{escape_markdown(title_raw, 2)}***"
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=get_text("zodiac_select_title", lang),
+            text=title_md,
             reply_markup=zodiac_keyboard(lang),
-            parse_mode="Markdown"
+            parse_mode=ParseMode.MARKDOWN_V2
         )
     except BadRequest as e:
         logger.error(f"Error showing horoscope menu: {e}")
@@ -778,7 +774,8 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     # --- Final Assembly ---
-    disclaimer_text_md = f"_{escape_markdown(get_text('horoscope_disclaimer', lang), 2)}_"
+    disclaimer_raw = get_text('horoscope_disclaimer', lang)
+    disclaimer_text_md = f"> _{escape_markdown(disclaimer_raw, 2)}_"
 
     text = (
         f"{title}\n\n"
@@ -1064,7 +1061,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     description_raw = get_text('premium_menu_description', lang)
 
     # Escape text for MarkdownV2 and apply formatting
-    title_md = f"**{escape_markdown(title_raw, 2)}**"
+    title_md = f"💵 **{escape_markdown(title_raw, 2)}**"
     description_md = f"> {escape_markdown(description_raw, 2)}"
 
     text = f"{title_md}\n\n{description_md}"
@@ -1173,13 +1170,17 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         support_link
     )
 
+    # Add a title and format the main body as a blockquote
+    title = f"📨 ***{escape_markdown('Связь', 2)}***"
     quoted_text = "\n".join([f"> {line}" for line in info_text_with_link.splitlines()])
+
+    final_text = f"{title}\n\n{quoted_text}"
 
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=quoted_text,
+            text=final_text,
             reply_markup=back_to_settings_keyboard(lang),
             parse_mode=ParseMode.MARKDOWN_V2,
             disable_web_page_preview=True
