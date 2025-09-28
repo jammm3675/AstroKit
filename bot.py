@@ -617,36 +617,23 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     user = query.from_user
     chat_id = query.message.chat_id
     user_info = get_user_data(chat_id)
-    lang = query.data.split("_")[-1]
+    lang = query.data.split("_")[-1]  # 'ru' or 'en'
     user_info["language"] = lang
 
+    # If user is new, show full welcome message and set flag to false
     if user_info.get("is_new_user"):
         user_info["is_new_user"] = False
-
-        agreement_link_text = get_text("user_agreement_link_text", lang)
-        agreement_url = get_text("user_agreement_url", lang)
-        agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
-
-        welcome_template = get_text("welcome", lang)
-
-        # Escape the template first, then replace the placeholder with the pre-formatted link
-        welcome_text = escape_markdown(welcome_template, 2).replace(
-            escape_markdown('{user_agreement}', 2),
-            agreement_link
-        )
-
-        # Now, format the rest of the placeholders like first_name
-        final_text = welcome_text.format(first_name=escape_markdown(user.first_name, 2))
-
+        welcome_text = get_text("welcome", lang).format(first_name=user.first_name)
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=final_text,
+            text=welcome_text,
             reply_markup=main_menu_keyboard(lang),
-            parse_mode=ParseMode.MARKDOWN_V2,
+            parse_mode="Markdown",
             disable_web_page_preview=True
         )
     else:
+        # If user is just changing language, show the main menu
         await show_main_menu(update, context)
 
 
