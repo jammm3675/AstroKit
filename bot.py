@@ -706,23 +706,11 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     update_crypto_prices()
     
     current_date = datetime.now().strftime("%d.%m.%Y")
-    
-    # Get market data text
-    market_text = get_text("market_rates_title", lang)
-    for symbol in CRYPTO_IDS:
-        price_data = crypto_prices[symbol]
-        if price_data["price"] is not None and price_data["change"] is not None:
-            change_text, bar = format_change_bar(price_data["change"])
-            last_update = price_data["last_update"].strftime("%H:%M") if price_data["last_update"] else "N/A"
-            source = price_data.get("source", "unknown")
-            source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n{get_text('updated_at', lang)}: {last_update} {source_emoji}\n\n"
 
     # Get the translated zodiac sign name for display
     display_zodiac = zodiac
     if lang != "ru":
         display_zodiac = ZODIAC_CALLBACK_MAP.get(lang, {}).get(zodiac, zodiac)
-
 
     # Get the horoscope text using the stored index for the user
     user_info = get_user_data(chat_id)
@@ -733,13 +721,43 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         horoscope_text = get_text('horoscope_unavailable', lang)
 
+    # --- Market Data ---
+    market_data_items = []
+    last_update_time = "N/A"
+    last_update_source_emoji = "❓"
+
+    for symbol in CRYPTO_IDS:
+        price_data = crypto_prices[symbol]
+        if price_data["price"] is not None and price_data["change"] is not None:
+            change_text, bar = format_change_bar(price_data["change"])
+            market_data_items.append(f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}")
+            if price_data["last_update"]:
+                # The update time is the same for all, so we can just grab the last one
+                last_update_time = price_data["last_update"].strftime("%H:%M")
+                source = price_data.get("source", "unknown")
+                last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
+
+    market_data_str = "\n\n".join(market_data_items)
+    update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
+
+    # --- Message Formatting ---
+    # Combine the content that needs to be block-quoted
+    content_to_quote = (
+        f"{horoscope_text}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"*{get_text('market_rates_title', lang)}*\n"
+        f"{market_data_str}\n\n"
+        f"{update_line}"
+    )
+
+    # Format as a blockquote
+    quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
+
     disclaimer_text = get_text("horoscope_disclaimer", lang)
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
     text = (
         f"*{emoji} {display_zodiac} | {current_date}*\n\n"
-        f"{horoscope_text}\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"{market_text}"
+        f"{quoted_content}\n\n"
         f"{disclaimer_text}"
     )
     
@@ -769,10 +787,16 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if tip_index is not None:
         tip_text = TEXTS["learning_tips"][lang][tip_index]
     else:
-        tip_text = get_text('horoscope_unavailable', lang) # Re-using a generic error message
+        tip_text = get_text('horoscope_unavailable', lang)  # Re-using a generic error message
 
-    text = f" *{get_text('tip_of_the_day_title', lang)}*\n\n🌟 {tip_text}"
-    
+    # Format the tip as a blockquote
+    quoted_tip = "\n".join([f"> {line}" for line in tip_text.splitlines()])
+
+    text = (
+        f"*{get_text('tip_of_the_day_title', lang)}*\n\n"
+        f"🌟 {quoted_tip}"
+    )
+
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
@@ -791,9 +815,12 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
     
+    description = get_text('settings_menu_description', lang)
+    quoted_description = "\n".join([f"> {line}" for line in description.splitlines()])
+
     text = (
         f"*{get_text('settings_title', lang)}*\n\n"
-        f"{get_text('settings_menu_description', lang)}"
+        f"{quoted_description}"
     )
     
     try:
@@ -892,20 +919,40 @@ def format_daily_summary(lang: str) -> str:
     current_date = datetime.now(pytz.timezone("Europe/Moscow")).strftime("%d.%m.%Y")
     horoscope_section = "\n\n".join(horoscopes.values())
 
-    # Update and format market data
+    # --- Market Data ---
     update_crypto_prices()
-    market_text = f"*{get_text('market_rates_title', lang)}*\n"
+    market_data_items = []
+    last_update_time = "N/A"
+    last_update_source_emoji = "❓"
+
     for symbol in CRYPTO_IDS:
         price_data = crypto_prices[symbol]
         if price_data["price"] is not None and price_data["change"] is not None:
             change_text, bar = format_change_bar(price_data["change"])
-            market_text += f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}\n"
+            market_data_items.append(f"{symbol.upper()}: ${price_data['price']:,.2f} {change_text} (24h)\n{bar}")
+            if price_data["last_update"]:
+                last_update_time = price_data["last_update"].strftime("%H:%M")
+                source = price_data.get("source", "unknown")
+                last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(source, "❓")
+
+    market_data_str = "\n\n".join(market_data_items)
+    update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
+
+    # --- Message Formatting ---
+    content_to_quote = (
+        f"{horoscope_section}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"*{get_text('market_rates_title', lang)}*\n"
+        f"{market_data_str}\n\n"
+        f"{update_line}"
+    )
+
+    quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
 
     title = get_text('astro_command_title', lang)
     return (
         f"🌌 *{title} | {current_date}*\n\n"
-        f"{horoscope_section}\n\n"
-        f"{market_text}"
+        f"{quoted_content}"
     )
 
 async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -981,9 +1028,12 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
+    description = get_text('premium_menu_description', lang)
+    quoted_description = "\n".join([f"> {line}" for line in description.splitlines()])
+
     text = (
         f"*{get_text('premium_menu_title', lang)}*\n\n"
-        f"{get_text('premium_menu_description', lang)}"
+        f"{quoted_description}"
     )
     
     try:
@@ -1040,13 +1090,15 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    text = get_text("commands_info_text", lang)
+    info_text = get_text("commands_info_text", lang)
+    # Format the informational text as a blockquote
+    quoted_text = "\n".join([f"> {line}" for line in info_text.splitlines()])
 
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=text,
+            text=quoted_text,
             reply_markup=back_to_settings_keyboard(lang),
             parse_mode="Markdown"
         )
@@ -1061,13 +1113,15 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id = query.message.chat_id
     lang = get_user_lang(chat_id)
 
-    text = get_text("support_info_text", lang)
+    info_text = get_text("support_info_text", lang)
+    # Format the informational text as a blockquote
+    quoted_text = "\n".join([f"> {line}" for line in info_text.splitlines()])
 
     try:
         await context.bot.edit_message_text(
             chat_id=chat_id,
             message_id=query.message.message_id,
-            text=text,
+            text=quoted_text,
             reply_markup=back_to_settings_keyboard(lang),
             parse_mode="Markdown"
         )
