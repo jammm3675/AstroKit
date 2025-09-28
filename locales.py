@@ -246,14 +246,19 @@ TEXTS = {
         "en": "CRYPTO-HOROSCOPE",
         "zh": "加密星座运势"
     },
-    "commands_info_text": {
-        "ru": "ℹ️ *Доступные команды:*\n\nAstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня\n\nДля настройки бота в вашем чате обратитесь в [поддержку](t.me/CryptoAstroSupport).",
-        "en": "ℹ️ *Available commands:*\n\nAstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day\n\nTo set up the bot in your chat, contact [support](t.me/CryptoAstroSupport).",
-        "zh": "ℹ️ *可用命令:*\n\nAstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示\n\n要在您的聊天中设置机器人，请联系[支持](t.me/CryptoAstroSupport)。"
+    "commands_info_title": {
+        "ru": "ℹ️ *Доступные команды:*",
+        "en": "ℹ️ *Available commands:*",
+        "zh": "ℹ️ *可用命令:*"
+    },
+    "commands_info_body": {
+        "ru": "AstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня\n\nДля настройки бота в вашем чате обратитесь в [поддержку](t.me/ton_geist).",
+        "en": "AstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day\n\nTo set up the bot in your chat, contact [support](t.me/ton_geist).",
+        "zh": "AstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示\n\n要在您的聊天中设置机器人，请联系[支持](t.me/ton_geist)。"
     },
     "support_info_text": {
-        "ru": "По всем вопросам, связанным с предложениями, ошибками или сотрудничеством, пожалуйста, обращайтесь в нашу [поддержку](t.me/CryptoAstroSupport).",
-        "en": "For all suggestions, bugs, questions, or collaboration inquiries, please contact our [support](t.me/CryptoAstroSupport).",
-        "zh": "有关所有建议、错误、问题或合作咨询，请联系我们的[支持](t.me/CryptoAstroSupport)。"
+        "ru": "По всем вопросам, связанным с предложениями, ошибками или сотрудничеством, пожалуйста, обращайтесь в нашу [поддержку](t.me/ton_geist).",
+        "en": "For all suggestions, bugs, questions, or collaboration inquiries, please contact our [support](t.me/ton_geist).",
+        "zh": "有关所有建议、错误、问题或合作咨询，请联系我们的[支持](t.me/ton_geist)。"
     }
 }
