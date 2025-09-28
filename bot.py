@@ -346,8 +346,11 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user_info.get("is_new_user"):
         user_info["is_new_user"] = False
         lang = user_info["language"]
-        agreement_link = f'[{escape_markdown(get_text("user_agreement_link_text", lang), 2)}]({get_text("user_agreement_url", lang)})'
-        welcome_text = escape_markdown(get_text("welcome", lang), 2).replace(escape_markdown('{first_name}', 2), escape_markdown(user.first_name, 2)).replace(escape_markdown('{user_agreement}', 2), agreement_link)
+        agreement_link_text = escape_markdown(get_text("user_agreement_link_text", lang), 2)
+        agreement_url = get_text("user_agreement_url", lang)
+        agreement_link = f'[{agreement_link_text}]({agreement_url})'
+        welcome_text_template = escape_markdown(get_text("welcome", lang), 2)
+        welcome_text = welcome_text_template.format(first_name=escape_markdown(user.first_name, 2), user_agreement=agreement_link)
         await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=welcome_text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2, disable_web_page_preview=True)
     else:
         await show_main_menu(update, context)
@@ -359,7 +362,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = get_user_lang(chat_id)
     update_user_horoscope(chat_id)
     update_crypto_prices()
-    title = f"*{escape_markdown(get_text('main_menu_title', lang), 2)}*"
+    title = f"✨ *{escape_markdown(get_text('main_menu_title', lang), 2)}* ✨"
     prompt = f"> {escape_markdown(get_text('main_menu_prompt', lang), 2)}"
     text = f"{title}\n\n{prompt}"
     try:
@@ -368,7 +371,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         else:
             welcome_back_raw = get_text("welcome_back", lang)
             welcome_back_text = welcome_back_raw.format(first_name=escape_markdown(update.effective_user.first_name, 2))
-            full_text = f"*{escape_markdown(welcome_back_text, 2)}*\n\n{prompt}"
+            full_text = f"{escape_markdown(welcome_back_text, 2)}\n\n{prompt}"
             await context.bot.send_message(chat_id=chat_id, text=full_text, reply_markup=main_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
     except BadRequest as e:
         logger.error(f"Error showing main menu: {e}")
@@ -379,7 +382,7 @@ async def show_horoscope_menu(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     update_user_horoscope(chat_id)
     title = get_text("zodiac_select_title", lang)
-    await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=f"*{escape_markdown(title, 2)}*", reply_markup=zodiac_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
+    await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=f"♈ *{escape_markdown(title, 2)}*", reply_markup=zodiac_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TYPE, zodiac: str) -> None:
     query = update.callback_query
@@ -399,11 +402,13 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
             change_text, bar = format_change_bar(price_data["change"])
             market_data_items.append(f"{escape_markdown(symbol.upper(), 2)}: ${escape_markdown(f'{price_data["price"]:,.2f}', 2)} {escape_markdown(change_text, 2)} \\(24h\\)\n{bar}")
             if price_data["last_update"]:
-                last_update_time, last_update_source_emoji = price_data["last_update"].strftime("%H:%M"), {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
+                last_update_time = price_data["last_update"].strftime("%H:%M")
+                last_update_source_emoji = {"coingecko": "🦎", "binance": "📊", "cryptocompare": "🔄", "fallback": "🛡️"}.get(price_data.get("source", "unknown"), "❓")
     market_data_str = "\n\n".join(market_data_items)
     update_line = f"{get_text('updated_at', lang)}: {last_update_time} {last_update_source_emoji}"
-    content_to_quote = f"*{escape_markdown(get_text('market_rates_title', lang), 2)}*\n{market_data_str}\n\n{update_line}"
-    quoted_content = "\n".join([f"> {escape_markdown(line, 2)}" for line in content_to_quote.splitlines()])
+    market_title = get_text('market_rates_title', lang)
+    content_to_quote = f"*{escape_markdown(market_title, 2)}*\n{escape_markdown(market_data_str, 2)}\n\n{escape_markdown(update_line, 2)}"
+    quoted_content = "\n".join([f"> {line}" for line in content_to_quote.splitlines()])
     disclaimer_text = get_text("horoscope_disclaimer", lang)
     emoji = ZODIAC_EMOJIS.get(zodiac, "✨")
     text = f"*{emoji} {escape_markdown(display_zodiac, 2)} | {current_date}*\n\n> {escape_markdown(horoscope_text, 2)}\n\n{quoted_content}\n\n_{escape_markdown(disclaimer_text, 2)}_"
@@ -416,7 +421,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     tip_index = get_user_data(chat_id).get("tip_index")
     tip_text = TEXTS["learning_tips"][lang][tip_index] if tip_index is not None else get_text('horoscope_unavailable', lang)
     title = get_text('tip_of_the_day_title', lang)
-    text = f"*{escape_markdown(title, 2)}*\n\n> 🌟 {escape_markdown(tip_text, 2)}"
+    text = f"💡 *{escape_markdown(title, 2)}*\n\n> 🌟 {escape_markdown(tip_text, 2)}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=back_to_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -425,7 +430,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     title = get_text('settings_title', lang)
     description = get_text('settings_menu_description', lang)
-    text = f"*{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)} 🛠️"
+    text = f"⚙️ *{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)} 🛠️"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=settings_keyboard(chat_id, lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def change_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -491,7 +496,7 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     tip_index = get_user_data(chat_id).get("tip_index")
     tip_text = TEXTS["learning_tips"][lang][tip_index or 0]
     title = get_text('tip_of_the_day_title', lang)
-    text = f"*{escape_markdown(title, 2)}*\n\n> 🌟 {escape_markdown(tip_text, 2)}"
+    text = f"💡 *{escape_markdown(title, 2)}*\n\n> 🌟 {escape_markdown(tip_text, 2)}"
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
 
 async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
@@ -521,7 +526,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     title = get_text('premium_menu_title', lang)
     description = get_text('premium_menu_description', lang)
-    text = f"*{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)} 🙏"
+    text = f"✨ *{escape_markdown(title, 2)}*\n\n> {escape_markdown(description, 2)} 🙏"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=premium_menu_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def support_with_stars(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -544,7 +549,8 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     title = get_text("commands_info_title", lang)
     support_link = f'[{escape_markdown(get_text("support_link_text", lang), 2)}]({get_text("support_url", lang)})'
-    body = get_text("commands_info_body", lang).format(support_link=support_link)
+    body_template = get_text("commands_info_body", lang)
+    body = body_template.replace("{support_link}", support_link)
     quoted_body = "\n".join([f"> {line}" for line in escape_markdown(body, 2).replace(escape_markdown(support_link, 2), support_link).splitlines()])
     text = f"*{escape_markdown(title, 2)}*\n\n{quoted_body}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=text, reply_markup=back_to_settings_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
@@ -554,14 +560,15 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await query.answer()
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
     support_link = f'[{escape_markdown(get_text("support_link_text", lang), 2)}]({get_text("support_url", lang)})'
-    info_text = get_text("support_info_text", lang).format(support_link=support_link)
+    info_text_template = get_text("support_info_text", lang)
+    info_text = info_text_template.format(support_link=support_link)
     quoted_text = f"> {escape_markdown(info_text, 2).replace(escape_markdown(support_link, 2), support_link)}"
     await context.bot.edit_message_text(chat_id=chat_id, message_id=query.message.message_id, text=quoted_text, reply_markup=back_to_settings_keyboard(lang), parse_mode=ParseMode.MARKDOWN_V2)
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id, lang = update.message.chat.id, get_user_lang(update.message.chat.id)
     thank_you_text = get_text("payment_thank_you", lang)
-    await context.bot.send_message(chat_id=chat_id, text=escape_markdown(thank_you_text, 2), reply_markup=back_to_menu_keyboard(lang))
+    await context.bot.send_message(chat_id=chat_id, text=f"✨ {escape_markdown(thank_you_text, 2)} ✨", reply_markup=back_to_menu_keyboard(lang))
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
