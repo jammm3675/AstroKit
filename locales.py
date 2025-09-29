@@ -28,6 +28,36 @@ TEXTS = {
         "en": "https://telegra.ph/Polzovatelskoe-soglashenie--Terms-of-Service-08-07",
         "zh": "https://telegra.ph/Polzovatelskoe-soglashenie--Terms-of-Service-08-07"
     },
+    "news_link_text": {
+        "ru": "Новости",
+        "en": "News",
+        "zh": "消息"
+    },
+    "news_link_url": {
+        "ru": "https://t.me/kit_project",
+        "en": "https://t.me/kit_project",
+        "zh": "https://t.me/kit_project"
+    },
+    "x_link_text": {
+        "ru": "X",
+        "en": "X",
+        "zh": "X"
+    },
+    "x_link_url": {
+        "ru": "https://x.com/not_jammm?s=09",
+        "en": "https://x.com/not_jammm?s=09",
+        "zh": "https://x.com/not_jammm?s=09"
+    },
+    "chat_link_text": {
+        "ru": "Чат",
+        "en": "Chat",
+        "zh": "聊天"
+    },
+    "chat_link_url": {
+        "ru": "https://t.me/+oK0vVkt-aEAwMTNi",
+        "en": "https://t.me/+oK0vVkt-aEAwMTNi",
+        "zh": "https://t.me/+oK0vVkt-aEAwMTNi"
+    },
     "support_link_text": {
         "ru": "поддержку",
         "en": "support",
@@ -58,9 +88,9 @@ TEXTS = {
         "zh": "选择你的语言"
     },
     "welcome": {
-        "ru": "✨ *Добро пожаловать в AstroKit, {first_name}* ✨\n🌟Ваш персональный крипто-астролог!\n📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\nВыбери интересующий раздел, но перед этим ознакомься с {user_agreement}.",
-        "en": "Welcome to AstroKit, {first_name}!\n\nYour personal crypto astrologer!\nBased on star charts and market trends, I can give you advice for today!\n\nChoose a section you're interested in, but first, please read the {user_agreement}.",
-        "zh": "欢迎来到 AstroKit, {first_name}!\n\n您的个人加密占星师！\n根据星象图和市场趋势，我可以为您提供今日建议！\n\n选择您感兴趣的部分，但首先，请阅读{user_agreement}."
+        "ru": "✨ Добро пожаловать в AstroKit, {first_name}! ✨\n🌟 Ваш персональный крипто-астролог!\n📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\nВыбери интересующий раздел, но перед этим ознакомься с {user_agreement}",
+        "en": "✨ Welcome to AstroKit, {first_name}! ✨\n🌟 Your personal crypto-astrologer!\n📅 Based on star charts and market trends, I can give you advice for today!\nChoose a section you're interested in, but first, please read the {user_agreement}",
+        "zh": "✨ 欢迎来到 AstroKit, {first_name}! ✨\n🌟 您的个人加密占星师!\n📅 根据星象图和市场趋势，我可以为您提供今日建议!\n选择您感兴趣的部分，但首先，请阅读{user_agreement}"
     },
     "welcome_back": {
         "ru": "С возвращением, {first_name}! Что вас интересует сегодня?",

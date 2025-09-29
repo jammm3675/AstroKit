@@ -634,9 +634,15 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         escaped_first_name = escape_markdown(user.first_name, 2)
         agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
 
-        # The template from locales.py now contains the necessary Markdown.
-        # We just format it with the escaped/safe values.
-        final_text = welcome_template.format(
+        # Format the welcome message
+        welcome_lines = welcome_template.split('\n')
+        welcome_lines[0] = f"*{escape_markdown(welcome_lines[0], 2)}*"
+        for i in range(1, len(welcome_lines)):
+            welcome_lines[i] = escape_markdown(welcome_lines[i], 2)
+
+        formatted_welcome = '\n'.join(welcome_lines)
+
+        final_text = formatted_welcome.format(
             first_name=escaped_first_name,
             user_agreement=agreement_link
         )
@@ -669,9 +675,23 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     title = f"✨ *{escape_markdown(title_raw, 2)}* ✨"
 
     prompt_raw = get_text('main_menu_prompt', lang)
-    prompt = f"> {escape_markdown(prompt_raw, 2)}"
+    prompt = f"{escape_markdown(prompt_raw, 2)}"
 
-    text_to_send = f"{title}\n\n{prompt}"
+    # --- Add external links ---
+    news_text = get_text('news_link_text', lang)
+    news_url = get_text('news_link_url', lang)
+    x_text = get_text('x_link_text', lang)
+    x_url = get_text('x_link_url', lang)
+    chat_text = get_text('chat_link_text', lang)
+    chat_url = get_text('chat_link_url', lang)
+
+    news_link = f'[{escape_markdown(news_text, 2)}]({news_url})'
+    x_link = f'[{escape_markdown(x_text, 2)}]({x_url})'
+    chat_link = f'[{escape_markdown(chat_text, 2)}]({chat_url})'
+
+    links_line = f'{news_link} | {x_link} | {chat_link}'
+
+    text_to_send = f"{title}\n\n{prompt}\n\n{links_line}"
 
     try:
         if query:
@@ -680,17 +700,19 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                 message_id=query.message.message_id,
                 text=text_to_send,
                 reply_markup=main_menu_keyboard(lang),
-                parse_mode=ParseMode.MARKDOWN_V2
+                parse_mode=ParseMode.MARKDOWN_V2,
+                disable_web_page_preview=True
             )
         else:
             welcome_back_raw = get_text("welcome_back", lang)
             welcome_back_text = welcome_back_raw.format(first_name=escape_markdown(update.effective_user.first_name, 2))
-            full_text = f"{escape_markdown(welcome_back_text, 2)}\n\n{prompt}"
+            full_text = f"{escape_markdown(welcome_back_text, 2)}\n\n{prompt}\n\n{links_line}"
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=full_text,
                 reply_markup=main_menu_keyboard(lang),
-                parse_mode=ParseMode.MARKDOWN_V2
+                parse_mode=ParseMode.MARKDOWN_V2,
+                disable_web_page_preview=True
             )
     except BadRequest as e:
         logger.error(f"Error showing main menu: {e}")
@@ -775,7 +797,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
 
     # --- Final Assembly ---
     disclaimer_raw = get_text('horoscope_disclaimer', lang)
-    disclaimer_text_md = f"> _{escape_markdown(disclaimer_raw, 2)}_"
+    disclaimer_text_md = f">_{escape_markdown(disclaimer_raw, 2)}_"
 
     text = (
         f"{title}\n\n"
@@ -819,7 +841,7 @@ async def show_learning_tip(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     emoji, _, tip_body = tip_text_raw.partition(' ')
     escaped_tip_body = escape_markdown(tip_body, 2)
 
-    quoted_tip = f"> {emoji} {escaped_tip_body}"
+    quoted_tip = f">{emoji} {escaped_tip_body}"
 
     text = f"{title_md}\n\n{quoted_tip}"
 
@@ -845,7 +867,7 @@ async def show_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE)
     title = f"⚙️ *{escape_markdown(title_raw, 2)}*"
 
     description_raw = get_text('settings_menu_description', lang)
-    description = f"> {escape_markdown(description_raw, 2)} 🛠️"
+    description = f">{escape_markdown(description_raw, 2)} 🛠️"
 
     text = f"{title}\n\n{description}"
 
@@ -1006,7 +1028,7 @@ async def day_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     emoji, _, tip_body = tip_text_raw.partition(' ')
     escaped_tip_body = escape_markdown(tip_body, 2)
 
-    quoted_tip = f"> {emoji} {escaped_tip_body}"
+    quoted_tip = f">{emoji} {escaped_tip_body}"
 
     text = f"{title_md}\n\n{quoted_tip}"
 
@@ -1061,8 +1083,8 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     description_raw = get_text('premium_menu_description', lang)
 
     # Escape text for MarkdownV2 and apply formatting
-    title_md = f"💵 **{escape_markdown(title_raw, 2)}**"
-    description_md = f"> {escape_markdown(description_raw, 2)}"
+    title_md = f"💵 *{escape_markdown(title_raw, 2)}*"
+    description_md = f">{escape_markdown(description_raw, 2)}"
 
     text = f"{title_md}\n\n{description_md}"
 
@@ -1135,7 +1157,7 @@ async def show_commands_info(update: Update, context: ContextTypes.DEFAULT_TYPE)
         support_link
     )
 
-    quoted_body = "\n".join([f"> {line}" for line in body_with_link.splitlines()])
+    quoted_body = "\n".join([f">{line}" for line in body_with_link.splitlines()])
 
     text = f"{title_md}\n\n{quoted_body}"
 
@@ -1172,7 +1194,7 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # Add a title and format the main body as a blockquote
     title = f"📨 ***{escape_markdown('Связь', 2)}***"
-    quoted_text = "\n".join([f"> {line}" for line in info_text_with_link.splitlines()])
+    quoted_text = "\n".join([f">{line}" for line in info_text_with_link.splitlines()])
 
     final_text = f"{title}\n\n{quoted_text}"
 
