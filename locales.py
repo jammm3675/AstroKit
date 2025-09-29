@@ -87,10 +87,25 @@ TEXTS = {
         "en": "Select your language",
         "zh": "选择你的语言"
     },
-    "welcome": {
-        "ru": "✨ Добро пожаловать в AstroKit, {first_name}! ✨\n🌟 Ваш персональный крипто-астролог!\n📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!\nВыбери интересующий раздел, но перед этим ознакомься с {user_agreement}",
-        "en": "✨ Welcome to AstroKit, {first_name}! ✨\n🌟 Your personal crypto-astrologer!\n📅 Based on star charts and market trends, I can give you advice for today!\nChoose a section you're interested in, but first, please read the {user_agreement}",
-        "zh": "✨ 欢迎来到 AstroKit, {first_name}! ✨\n🌟 您的个人加密占星师!\n📅 根据星象图和市场趋势，我可以为您提供今日建议!\n选择您感兴趣的部分，但首先，请阅读{user_agreement}"
+    "welcome_l1": {
+        "ru": "✨ Добро пожаловать в AstroKit, {first_name}! ✨",
+        "en": "✨ Welcome to AstroKit, {first_name}! ✨",
+        "zh": "✨ 欢迎来到 AstroKit, {first_name}! ✨"
+    },
+    "welcome_l2": {
+        "ru": "🌟 Ваш персональный крипто-астролог!",
+        "en": "🌟 Your personal crypto-astrologer!",
+        "zh": "🌟 您的个人加密占星师!"
+    },
+    "welcome_l3": {
+        "ru": "📅 На основе звездных карт и рыночных тенденций могу дать совет на сегодня!",
+        "en": "📅 Based on star charts and market trends, I can give you advice for today!",
+        "zh": "📅 根据星象图和市场趋势，我可以为您提供今日建议!"
+    },
+    "welcome_l4": {
+        "ru": "Выбери интересующий раздел, но перед этим ознакомься с {user_agreement}",
+        "en": "Choose a section you're interested in, but first, please read the {user_agreement}",
+        "zh": "选择您感兴趣的部分，但首先，请阅读{user_agreement}"
     },
     "welcome_back": {
         "ru": "С возвращением, {first_name}! Что вас интересует сегодня?",
