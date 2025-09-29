@@ -626,25 +626,22 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         user_info["is_new_user"] = False
 
         # Get raw texts
-        welcome_template = get_text("welcome", lang)
+        l1 = get_text("welcome_l1", lang).format(first_name=user.first_name)
+        l2 = get_text("welcome_l2", lang)
+        l3 = get_text("welcome_l3", lang)
+        l4 = get_text("welcome_l4", lang)
         agreement_link_text = get_text("user_agreement_link_text", lang)
         agreement_url = get_text("user_agreement_url", lang)
 
         # Prepare placeholder values
-        escaped_first_name = escape_markdown(user.first_name, 2)
         agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
 
         # Format the welcome message
-        welcome_lines = welcome_template.split('\n')
-        welcome_lines[0] = f"*{escape_markdown(welcome_lines[0], 2)}*"
-        for i in range(1, len(welcome_lines)):
-            welcome_lines[i] = escape_markdown(welcome_lines[i], 2)
-
-        formatted_welcome = '\n'.join(welcome_lines)
-
-        final_text = formatted_welcome.format(
-            first_name=escaped_first_name,
-            user_agreement=agreement_link
+        final_text = (
+            f"*{escape_markdown(l1, 2)}*\n"
+            f"{escape_markdown(l2, 2)}\n"
+            f"{escape_markdown(l3, 2)}\n"
+            f"{escape_markdown(l4, 2).replace(escape_markdown('{user_agreement}', 2), agreement_link)}"
         )
 
         await context.bot.edit_message_text(
@@ -689,7 +686,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     x_link = f'[{escape_markdown(x_text, 2)}]({x_url})'
     chat_link = f'[{escape_markdown(chat_text, 2)}]({chat_url})'
 
-    links_line = f'{news_link} | {x_link} | {chat_link}'
+    links_line = f'{news_link} \\| {x_link} \\| {chat_link}'
 
     text_to_send = f"{title}\n\n{prompt}\n\n{links_line}"
 
