@@ -644,9 +644,9 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
         # Format the final message without blockquote
         final_text = (
-            f"*{escape_markdown(l1, 2)}*\n"
-            f"{escape_markdown(l2, 2)}\n"
-            f"{escape_markdown(l3, 2)}\n"
+            f"*{escape_markdown(l1, 2)}*\n\n"
+            f"{escape_markdown(l2, 2)}\n\n"
+            f"{escape_markdown(l3, 2)}\n\n"
             f"{l4}"
         )
 
@@ -1087,7 +1087,10 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # Escape text for MarkdownV2 and apply formatting
     title_md = f"💵 *{escape_markdown(title_raw, 2)}*"
-    description_md = f"*{escape_markdown(description_raw, 2)}*"
+
+    # Format description as a multi-line blockquote
+    escaped_description = escape_markdown(description_raw, 2)
+    description_md = "\n".join([f">{line}" for line in escaped_description.splitlines()])
 
     text = f"{title_md}\n\n{description_md}"
 
