@@ -1199,7 +1199,8 @@ async def show_support_info(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
     # Add a title and format the main body as a blockquote
-    title = f"📨 ***{escape_markdown('Связь', 2)}***"
+    title_raw = get_text("support_info_title", lang)
+    title = f"📨 ***{escape_markdown(title_raw, 2)}***"
     quoted_text = "\n".join([f">{line}" for line in info_text_with_link.splitlines()])
 
     final_text = f"{title}\n\n{quoted_text}"
