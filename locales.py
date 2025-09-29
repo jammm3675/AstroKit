@@ -307,6 +307,11 @@ TEXTS = {
         "en": "AstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day\n\nTo set up the bot in your chat, contact {support_link}.",
         "zh": "AstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示\n\n要在您的聊天中设置机器人，请联系{support_link}。"
     },
+    "support_info_title": {
+        "ru": "Связь",
+        "en": "Contact",
+        "zh": "联系"
+    },
     "support_info_text": {
         "ru": "По всем вопросам, связанным с предложениями, ошибками или сотрудничеством, пожалуйста, обращайтесь в нашу {support_link}.",
         "en": "For all suggestions, bugs, questions, or collaboration inquiries, please contact our {support_link}.",
