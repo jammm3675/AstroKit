@@ -645,7 +645,7 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         # Format the final message without blockquote
         final_text = (
             f"*{escape_markdown(l1, 2)}*\n\n"
-            f"{escape_markdown(l2, 2)}\n\n"
+            f"{escape_markdown(l2, 2)}\n"
             f"{escape_markdown(l3, 2)}\n\n"
             f"{l4}"
         )
