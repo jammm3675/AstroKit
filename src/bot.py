@@ -625,23 +625,29 @@ async def set_language(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if user_info.get("is_new_user"):
         user_info["is_new_user"] = False
 
-        # Get raw texts
+        # Get raw texts for the welcome message
         l1 = get_text("welcome_l1", lang).format(first_name=user.first_name)
         l2 = get_text("welcome_l2", lang)
         l3 = get_text("welcome_l3", lang)
-        l4 = get_text("welcome_l4", lang)
+        l4_template = get_text("welcome_l4", lang)
         agreement_link_text = get_text("user_agreement_link_text", lang)
         agreement_url = get_text("user_agreement_url", lang)
 
-        # Prepare placeholder values
+        # Create the markdown link. The URL itself doesn't need escaping.
         agreement_link = f'[{escape_markdown(agreement_link_text, 2)}]({agreement_url})'
 
-        # Format the welcome message
+        # Escape the template parts around the placeholder
+        parts = l4_template.split('{user_agreement}')
+        escaped_parts = [escape_markdown(p, 2) for p in parts]
+        # Join the escaped parts with the unescaped link
+        l4 = agreement_link.join(escaped_parts)
+
+        # Format the final message without blockquote
         final_text = (
             f"*{escape_markdown(l1, 2)}*\n"
             f"{escape_markdown(l2, 2)}\n"
             f"{escape_markdown(l3, 2)}\n"
-            f"{escape_markdown(l4, 2).replace(escape_markdown('{user_agreement}', 2), agreement_link)}"
+            f"{l4}"
         )
 
         await context.bot.edit_message_text(
@@ -672,7 +678,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     title = f"✨ *{escape_markdown(title_raw, 2)}* ✨"
 
     prompt_raw = get_text('main_menu_prompt', lang)
-    prompt = f"{escape_markdown(prompt_raw, 2)}"
+    prompt = f">{escape_markdown(prompt_raw, 2)}"
 
     # --- Add external links ---
     news_text = get_text('news_link_text', lang)
@@ -1081,7 +1087,7 @@ async def show_premium_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
     # Escape text for MarkdownV2 and apply formatting
     title_md = f"💵 *{escape_markdown(title_raw, 2)}*"
-    description_md = f">{escape_markdown(description_raw, 2)}"
+    description_md = f"*{escape_markdown(description_raw, 2)}*"
 
     text = f"{title_md}\n\n{description_md}"
 
