@@ -83,12 +83,18 @@ def save_cache(key: str, value: dict):
     """Saves cache data to the database."""
     with sqlite3.connect(DATABASE_FILE) as conn:
         cursor = conn.cursor()
+        # Custom JSON serializer to handle datetime
+        def json_serializer(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError(f"Type {type(obj)} not serializable")
+
         cursor.execute("""
             INSERT OR REPLACE INTO cache (key, value, last_update)
             VALUES (?, ?, ?)
         """, (
             key,
-            json.dumps(value, default=str),
+            json.dumps(value, default=json_serializer),
             datetime.now().isoformat()
         ))
         conn.commit()
