@@ -119,30 +119,38 @@ def load_user_data_from_db():
         logger.error(f"Error loading user data from database: {e}")
 
 def load_cache_from_db():
-    """Loads cache from the database."""
+    """Loads cache from the database and correctly deserializes datetime strings."""
     global crypto_prices, api_cache
     try:
         cache_data = db.load_cache("main_cache")
-        if cache_data:
-            crypto_prices = cache_data.get("crypto_prices", crypto_prices)
-            api_cache = cache_data.get("api_cache", api_cache)
+        if not cache_data:
+            return False
 
-            # Convert last_update string back to datetime object
-            if api_cache.get("last_update") and isinstance(api_cache["last_update"], str):
+        loaded_crypto_prices = cache_data.get("crypto_prices", {})
+        loaded_api_cache = cache_data.get("api_cache", {})
+
+        # Deserialize datetime strings in api_cache
+        if loaded_api_cache.get("last_update") and isinstance(loaded_api_cache["last_update"], str):
+            try:
+                loaded_api_cache["last_update"] = datetime.fromisoformat(loaded_api_cache["last_update"])
+            except (ValueError, TypeError):
+                loaded_api_cache["last_update"] = None
+
+        # Deserialize datetime strings in crypto_prices
+        for symbol, data in loaded_crypto_prices.items():
+            if data.get("last_update") and isinstance(data["last_update"], str):
                 try:
-                    api_cache["last_update"] = datetime.fromisoformat(api_cache["last_update"])
-                except ValueError:
-                    api_cache["last_update"] = None  # Reset if format is incorrect
+                    data["last_update"] = datetime.fromisoformat(data["last_update"])
+                except (ValueError, TypeError):
+                    data["last_update"] = None
 
-            for symbol in crypto_prices:
-                if crypto_prices[symbol].get("last_update") and isinstance(crypto_prices[symbol]["last_update"], str):
-                    try:
-                        crypto_prices[symbol]["last_update"] = datetime.fromisoformat(crypto_prices[symbol]["last_update"])
-                    except ValueError:
-                        crypto_prices[symbol]["last_update"] = None
+        # Atomically update the global variables
+        crypto_prices = loaded_crypto_prices
+        api_cache = loaded_api_cache
 
-            logger.info("📂 Cache loaded from database")
-            return True
+        logger.info("📂 Cache loaded and deserialized from database")
+        return True
+
     except Exception as e:
         logger.error(f"Error loading cache from database: {e}")
     return False
@@ -1002,6 +1010,12 @@ async def broadcast_job(context: ContextTypes.DEFAULT_TYPE):
     logger.info("Daily broadcast job finished.")
 
 
+async def update_prices_job(context: ContextTypes.DEFAULT_TYPE):
+    """Job to update crypto prices asynchronously."""
+    logger.info("Running scheduled crypto price update...")
+    await update_crypto_prices()
+
+
 def premium_menu_keyboard(lang: str):
     """Creates the support/premium menu keyboard."""
     return InlineKeyboardMarkup([
@@ -1282,7 +1296,7 @@ def main() -> None:
     # Инициализация курсов криптовалют
     logger.info("📊 Инициализация курсов криптовалют...")
     if not cache_loaded:
-        asyncio.run(update_crypto_prices())
+        application.job_queue.run_once(update_prices_job, 0)
     else:
         logger.info("✅ Используем кэшированные данные")
 
@@ -1328,7 +1342,7 @@ def main() -> None:
 
         # Обновление курсов криптовалют каждые 5 минут
         application.job_queue.run_repeating(
-            lambda context: update_crypto_prices(),
+            update_prices_job,
             interval=300,
             name="crypto_update"
         )
