@@ -125,6 +125,21 @@ def load_cache_from_db():
         if cache_data:
             crypto_prices = cache_data.get("crypto_prices", crypto_prices)
             api_cache = cache_data.get("api_cache", api_cache)
+
+            # Convert last_update string back to datetime object
+            if api_cache.get("last_update") and isinstance(api_cache["last_update"], str):
+                try:
+                    api_cache["last_update"] = datetime.fromisoformat(api_cache["last_update"])
+                except ValueError:
+                    api_cache["last_update"] = None  # Reset if format is incorrect
+
+            for symbol in crypto_prices:
+                if crypto_prices[symbol].get("last_update") and isinstance(crypto_prices[symbol]["last_update"], str):
+                    try:
+                        crypto_prices[symbol]["last_update"] = datetime.fromisoformat(crypto_prices[symbol]["last_update"])
+                    except ValueError:
+                        crypto_prices[symbol]["last_update"] = None
+
             logger.info("📂 Cache loaded from database")
             return True
     except Exception as e:
