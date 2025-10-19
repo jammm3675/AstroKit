@@ -195,9 +195,9 @@ TEXTS = {
         "zh": "支持作者"
     },
     "premium_menu_description": {
-        "ru": "Если вам нравится AstroKit, вы можете поддержать автора, отправив немного TON или используя Telegram Stars. Ваша поддержка помогает развивать проект!",
-        "en": "If you enjoy AstroKit, you can support the author by sending some TON or using Telegram Stars. Your support helps the project grow!",
-        "zh": "如果您喜欢 AstroKit，可以通过发送一些 TON 或使用 Telegram Stars 来支持作者。您的支持有助于项目成长！"
+        "ru": "Если вам нравится AstroKit, вы можете поддержать автора, отправив немного TON или используя Telegram Stars.\n\nВаша поддержка помогает развивать проект!",
+        "en": "If you enjoy AstroKit, you can support the author by sending some TON or using Telegram Stars.\n\nYour support helps the project grow!",
+        "zh": "如果您喜欢 AstroKit，可以通过发送一些 TON 或使用 Telegram Stars 来支持作者。\n\n您的支持有助于项目成长！"
     },
     "premium_button_ton": {
         "ru": "Отправить 0.1 TON",
@@ -306,11 +306,6 @@ TEXTS = {
         "ru": "AstroKit можно добавить в ваш чат или канал!\n\n/astro - присылает гороскоп для всех знаков зодиака\n/day - присылает совет дня\n\nДля настройки бота в вашем чате обратитесь в {support_link}.",
         "en": "AstroKit can be added to your chat or channel!\n\n/astro - sends a horoscope for all zodiac signs\n/day - sends the tip of the day\n\nTo set up the bot in your chat, contact {support_link}.",
         "zh": "AstroKit可以添加到您的聊天或频道中！\n\n/astro - 发送所有星座的星座运势\n/day - 发送每日提示\n\n要在您的聊天中设置机器人，请联系{support_link}。"
-    },
-    "support_info_title": {
-        "ru": "Связь",
-        "en": "Contact",
-        "zh": "联系"
     },
     "support_info_text": {
         "ru": "По всем вопросам, связанным с предложениями, ошибками или сотрудничеством, пожалуйста, обращайтесь в нашу {support_link}.",
