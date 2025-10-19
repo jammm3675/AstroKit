@@ -15,6 +15,7 @@ from telegram.constants import ParseMode
 from telegram.helpers import escape_markdown
 from telegram.error import TelegramError, BadRequest, Conflict
 from locales import TEXTS, ZODIAC_SIGNS, ZODIAC_CALLBACK_MAP, ZODIAC_EMOJIS
+import database as db
 
 # --- Helper Functions ---
 
@@ -86,66 +87,49 @@ api_cache = {
     "current_source": "coingecko"
 }
 
-def save_cache_to_file():
-    """Сохранение кэша в файл"""
+def save_cache_to_db():
+    """Saves cache to the database."""
     try:
         cache_data = {
             "crypto_prices": crypto_prices,
-            "api_cache": api_cache,
-            "timestamp": datetime.now().isoformat()
+            "api_cache": api_cache
         }
-        with open("cache.json", "w") as f:
-            json.dump(cache_data, f, default=str)
-        logger.info("💾 Кэш сохранен в файл")
+        db.save_cache("main_cache", cache_data)
+        logger.info("💾 Cache saved to database")
     except Exception as e:
-        logger.error(f"Ошибка сохранения кэша: {e}")
+        logger.error(f"Error saving cache to database: {e}")
 
-def save_user_data_to_file():
-    """Saves user data to a file, handling date objects."""
+def save_user_data_to_db():
+    """Saves all user data to the database."""
     try:
-        # Create a deep copy to avoid modifying the original data
-        data_to_save = json.loads(json.dumps(user_data, default=str))
-
-        with open("user_data.json", "w") as f:
-            json.dump(data_to_save, f, indent=4)
-        logger.info("💾 User data saved to file")
+        for chat_id, data in user_data.items():
+            db.save_user_data(chat_id, data)
+        logger.info("💾 User data saved to database")
     except Exception as e:
-        logger.error(f"Error saving user data: {e}")
+        logger.error(f"Error saving user data to database: {e}")
 
-def load_user_data_from_file():
-    """Loads user data from a file."""
+def load_user_data_from_db():
+    """Loads all user data from the database."""
     global user_data
     try:
-        with open("user_data.json", "r") as f:
-            user_data = json.load(f)
-            # Convert integer keys back from string
-            user_data = {int(k): v for k, v in user_data.items()}
-            logger.info("📂 User data loaded from file")
-    except FileNotFoundError:
-        logger.info("📂 User data file not found, starting with empty data")
+        user_data = db.load_user_data()
+        logger.info("📂 User data loaded from database")
     except Exception as e:
-        logger.error(f"Error loading user data: {e}")
+        logger.error(f"Error loading user data from database: {e}")
 
-
-def load_cache_from_file():
-    """Загрузка кэша из файла"""
+def load_cache_from_db():
+    """Loads cache from the database."""
+    global crypto_prices, api_cache
     try:
-        with open("cache.json", "r") as f:
-            cache_data = json.load(f)
-        
-        # Восстанавливаем данные
-        global crypto_prices, api_cache
-        crypto_prices = cache_data.get("crypto_prices", crypto_prices)
-        api_cache = cache_data.get("api_cache", api_cache)
-        
-        logger.info("📂 Кэш загружен из файла")
-        return True
-    except FileNotFoundError:
-        logger.info("📂 Файл кэша не найден, используем значения по умолчанию")
-        return False
+        cache_data = db.load_cache("main_cache")
+        if cache_data:
+            crypto_prices = cache_data.get("crypto_prices", crypto_prices)
+            api_cache = cache_data.get("api_cache", api_cache)
+            logger.info("📂 Cache loaded from database")
+            return True
     except Exception as e:
-        logger.error(f"Ошибка загрузки кэша: {e}")
-        return False
+        logger.error(f"Error loading cache from database: {e}")
+    return False
 
 # Резервные данные на случай недоступности API
 FALLBACK_DATA = {
@@ -1312,9 +1296,9 @@ def keep_alive():
         except Exception as e:
             logger.error(f"❌ An unexpected error occurred during keep-alive ping to {health_url}: {e}")
 
-        # Wait for 14 minutes before the next ping
-        logger.info("...keep-alive thread sleeping for 14 minutes...")
-        time.sleep(14 * 60)
+        # Wait for 10 minutes before the next ping
+        logger.info("...keep-alive thread sleeping for 10 minutes...")
+        time.sleep(10 * 60)
 
 def main() -> None:
     """Основная функция запуска бота с оптимизацией для Render"""
@@ -1324,11 +1308,14 @@ def main() -> None:
 
     logger.info("🚀 Запуск AstroKit Bot...")
 
+    # Инициализация базы данных
+    db.init_db()
+
     # Загружаем кэш и данные пользователей при запуске
     logger.info("📂 Загрузка кэша...")
-    cache_loaded = load_cache_from_file()
+    cache_loaded = load_cache_from_db()
     logger.info("📂 Загрузка данных пользователей...")
-    load_user_data_from_file()
+    load_user_data_from_db()
 
     # Инициализация курсов криптовалют
     logger.info("📊 Инициализация курсов криптовалют...")
@@ -1387,7 +1374,7 @@ def main() -> None:
 
         # Периодическое сохранение кэша каждые 10 минут
         application.job_queue.run_repeating(
-            lambda context: save_cache_to_file(),
+            lambda context: save_cache_to_db(),
             interval=600,
             name="cache_save"
         )
@@ -1395,7 +1382,7 @@ def main() -> None:
 
         # Периодическое сохранение данных пользователей каждые 3 минуты
         application.job_queue.run_repeating(
-            lambda context: save_user_data_to_file(),
+            lambda context: save_user_data_to_db(),
             interval=180,
             name="user_data_save"
         )
