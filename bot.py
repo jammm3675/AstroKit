@@ -1293,13 +1293,6 @@ def main() -> None:
     logger.info("📂 Загрузка данных пользователей...")
     load_user_data_from_db()
 
-    # Инициализация курсов криптовалют
-    logger.info("📊 Инициализация курсов криптовалют...")
-    if not cache_loaded:
-        application.job_queue.run_once(update_prices_job, 0)
-    else:
-        logger.info("✅ Используем кэшированные данные")
-
     # Запуск Flask сервера в отдельном потоке
     server_thread = threading.Thread(target=run_flask_server, name="FlaskServer")
     server_thread.daemon = True
@@ -1330,6 +1323,13 @@ def main() -> None:
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     logger.info("✅ Обработчики зарегистрированы")
+
+    # Инициализация курсов криптовалют
+    logger.info("📊 Инициализация курсов криптовалют...")
+    if not cache_loaded:
+        application.job_queue.run_once(update_prices_job, 0)
+    else:
+        logger.info("✅ Используем кэшированные данные")
 
     # Задачи JobQueue
     if application.job_queue:
