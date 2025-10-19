@@ -1290,8 +1290,8 @@ def keep_alive():
         server_url = os.environ.get('RENDER_EXTERNAL_URL')
 
         if not server_url:
-            logger.warning("⚠️ RENDER_EXTERNAL_URL not found. Skipping keep-alive attempt. Retrying in 60s.")
-            time.sleep(60)
+            logger.warning("⚠️ RENDER_EXTERNAL_URL not found. Skipping keep-alive attempt. Retrying in 59s.")
+            time.sleep(59)
             continue
 
         health_url = f"{server_url}/health"
@@ -1311,9 +1311,8 @@ def keep_alive():
         except Exception as e:
             logger.error(f"❌ An unexpected error occurred during keep-alive ping to {health_url}: {e}")
 
-        # Wait for 14 minutes before the next ping
-        logger.info("...keep-alive thread sleeping for 14 minutes...")
-        time.sleep(14 * 60)
+        logger.info("...keep-alive thread sleeping for 10 minutes...")
+        time.sleep(10 * 60)
 
 def main() -> None:
     """Основная функция запуска бота с оптимизацией для Render"""
@@ -1348,7 +1347,7 @@ def main() -> None:
         wakeup_thread = threading.Thread(target=keep_alive, name="KeepAlive")
         wakeup_thread.daemon = True
         wakeup_thread.start()
-        logger.info("🔔 Keep-alive активирован (интервал: 14 минут)")
+        logger.info("🔔 Keep-alive активирован (интервал: 10 минут)")
     else:
         logger.info("🏠 Локальный режим - keep-alive отключен")
 
