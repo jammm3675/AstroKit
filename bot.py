@@ -3,6 +3,7 @@ import os
 import threading
 import time
 import requests
+import aiohttp
 import asyncio
 import random
 import json
@@ -302,178 +303,124 @@ def update_user_horoscope(chat_id: int):
 
         logger.info(f"Content indices updated for user {chat_id} for {today_moscow}")
 
-def update_crypto_prices():
-    """Обновляет курсы криптовалют, ротируя источники для надежности."""
+async def update_crypto_prices():
+    """Асинхронно обновляет курсы криптовалют, ротируя источники."""
     try:
-        # Проверяем, нужно ли обновлять данные из API
-        if api_cache["last_update"] is not None and \
-           (datetime.now() - api_cache["last_update"]).total_seconds() < api_cache["cache_duration"]:
-            logger.info("Используем кэшированные данные курсов (в пределах окна кэширования).")
+        if api_cache.get("last_update") and (datetime.now() - api_cache["last_update"]).total_seconds() < api_cache["cache_duration"]:
+            logger.info("Using cached crypto prices within the cache window.")
             return
 
-        # Ротация источников API для распределения нагрузки
         sources = ["coingecko", "binance", "cryptocompare"]
-
-        # Начинаем со следующего источника в списке
         _switch_api_source()
 
-        initial_source = api_cache["current_source"]
-
-        for i in range(len(sources)):
+        for _ in range(len(sources)):
             current_source = api_cache["current_source"]
-            logger.info(f"Попытка обновления курсов от источника: {current_source}")
+            logger.info(f"Attempting to update prices from: {current_source}")
 
             success = False
-            if current_source == "coingecko":
-                success = _update_from_coingecko()
-            elif current_source == "binance":
-                success = _update_from_binance()
-            elif current_source == "cryptocompare":
-                success = _update_from_cryptocompare()
+            async with aiohttp.ClientSession() as session:
+                if current_source == "coingecko":
+                    success = await _update_from_coingecko(session)
+                elif current_source == "binance":
+                    success = await _update_from_binance(session)
+                elif current_source == "cryptocompare":
+                    success = await _update_from_cryptocompare(session)
 
             if success:
                 api_cache["last_update"] = datetime.now()
-                logger.info(f"Курсы успешно обновлены от {current_source}")
-                save_cache_to_file()
-                return # Успешно, выходим из функции
+                logger.info(f"Successfully updated prices from {current_source}")
+                save_cache_to_db()
+                return
             else:
-                logger.warning(f"Не удалось обновить от {current_source}. Переключение на следующий источник.")
+                logger.warning(f"Failed to update from {current_source}. Switching source.")
                 _switch_api_source()
 
-        # Если все источники не сработали
-        logger.error("Все источники API недоступны. Используем резервные данные.")
+        logger.error("All API sources failed. Using fallback data.")
         _use_fallback_data()
-        save_cache_to_file()
+        save_cache_to_db()
 
     except Exception as e:
-        logger.error(f"Критическая ошибка при обновлении курсов: {e}")
+        logger.error(f"Critical error during price update: {e}")
         _use_fallback_data()
 
-def _update_from_coingecko():
-    """Обновление курсов от CoinGecko API"""
+async def _update_from_coingecko(session):
+    """Асинхронное обновление курсов от CoinGecko API"""
     try:
         api_config = CRYPTO_APIS["coingecko"]
-        response = requests.get(
-            api_config["url"],
-            params=api_config["params"],
-            headers=api_config["headers"],
-            timeout=15
-        )
-
-        if response.status_code == 429:
-            logger.warning("CoinGecko: превышен лимит запросов")
-            return False
-
-        response.raise_for_status()
-        prices = response.json()
+        async with session.get(api_config["url"], params=api_config["params"], headers=api_config["headers"], timeout=15) as response:
+            if response.status == 429:
+                logger.warning("CoinGecko: Rate limit exceeded")
+                return False
+            response.raise_for_status()
+            prices = await response.json()
 
         current_time = datetime.now()
-        success_count = 0
-
         for symbol, coin_id in CRYPTO_IDS.items():
-            if coin_id in prices:
-                coin_data = prices[coin_id]
-                price = coin_data.get("usd")
-                change = coin_data.get("usd_24h_change")
-
-                if price is not None and change is not None:
-                    crypto_prices[symbol]["price"] = price
-                    crypto_prices[symbol]["change"] = change
-                    crypto_prices[symbol]["last_update"] = current_time
-                    crypto_prices[symbol]["source"] = "coingecko"
-                    success_count += 1
-                    logger.info(f"Курс {symbol.upper()}: ${price:.2f} ({change:.2f}%)")
-
-        return success_count > 0
-
+            if coin_id in prices and prices[coin_id].get("usd") is not None:
+                crypto_prices[symbol].update({
+                    "price": prices[coin_id]["usd"],
+                    "change": prices[coin_id].get("usd_24h_change"),
+                    "last_update": current_time,
+                    "source": "coingecko"
+                })
+        return True
     except Exception as e:
-        logger.error(f"Ошибка CoinGecko API: {e}")
+        logger.error(f"CoinGecko API error: {e}")
         return False
 
-def _update_from_binance():
-    """Обновление курсов от Binance API"""
+async def _update_from_binance(session):
+    """Асинхронное обновление курсов от Binance API"""
     try:
         api_config = CRYPTO_APIS["binance"]
         current_time = datetime.now()
-        success_count = 0
+        symbol_map = {"BTCUSDT": "btc", "ETHUSDT": "eth", "TONUSDT": "ton"}
 
         for symbol in api_config["symbols"]:
-            response = requests.get(
-                f"{api_config['url']}?symbol={symbol}",
-                timeout=10
-            )
+            async with session.get(f"{api_config['url']}?symbol={symbol}", timeout=10) as response:
+                if response.status == 429:
+                    logger.warning("Binance: Rate limit exceeded")
+                    return False
+                response.raise_for_status()
+                data = await response.json()
 
-            if response.status_code == 429:
-                logger.warning("Binance: превышен лимит запросов")
-                return False
-
-            response.raise_for_status()
-            data = response.json()
-
-            # Преобразуем символы Binance в наши символы
-            symbol_map = {"BTCUSDT": "btc", "ETHUSDT": "eth", "TONUSDT": "ton"}
             our_symbol = symbol_map.get(symbol)
-
-            if our_symbol and data:
-                price = float(data.get("lastPrice", 0))
-                change = float(data.get("priceChangePercent", 0))
-
-                if price > 0:
-                    crypto_prices[our_symbol]["price"] = price
-                    crypto_prices[our_symbol]["change"] = change
-                    crypto_prices[our_symbol]["last_update"] = current_time
-                    crypto_prices[our_symbol]["source"] = "binance"
-                    success_count += 1
-                    logger.info(f"Курс {our_symbol.upper()}: ${price:.2f} ({change:.2f}%)")
-
-        return success_count > 0
-
+            if our_symbol and data.get("lastPrice"):
+                crypto_prices[our_symbol].update({
+                    "price": float(data["lastPrice"]),
+                    "change": float(data.get("priceChangePercent", 0)),
+                    "last_update": current_time,
+                    "source": "binance"
+                })
+        return True
     except Exception as e:
-        logger.error(f"Ошибка Binance API: {e}")
+        logger.error(f"Binance API error: {e}")
         return False
 
-def _update_from_cryptocompare():
-    """Обновление курсов от CryptoCompare API"""
+async def _update_from_cryptocompare(session):
+    """Асинхронное обновление курсов от CryptoCompare API"""
     try:
         api_config = CRYPTO_APIS["cryptocompare"]
-        response = requests.get(
-            api_config["url"],
-            params=api_config["params"],
-            timeout=15
-        )
-
-        if response.status_code == 429:
-            logger.warning("CryptoCompare: превышен лимит запросов")
-            return False
-
-        response.raise_for_status()
-        data = response.json()
+        async with session.get(api_config["url"], params=api_config["params"], timeout=15) as response:
+            if response.status == 429:
+                logger.warning("CryptoCompare: Rate limit exceeded")
+                return False
+            response.raise_for_status()
+            data = await response.json()
 
         current_time = datetime.now()
-        success_count = 0
-
+        symbol_map = {"BTC": "btc", "ETH": "eth", "TON": "ton"}
         if "RAW" in data:
-            raw_data = data["RAW"]
-            symbol_map = {"BTC": "btc", "ETH": "eth", "TON": "ton"}
-
             for api_symbol, our_symbol in symbol_map.items():
-                if api_symbol in raw_data and "USD" in raw_data[api_symbol]:
-                    usd_data = raw_data[api_symbol]["USD"]
-                    price = usd_data.get("PRICE", 0)
-                    change = usd_data.get("CHANGEPCT24HOUR", 0)
-
-                    if price > 0:
-                        crypto_prices[our_symbol]["price"] = price
-                        crypto_prices[our_symbol]["change"] = change
-                        crypto_prices[our_symbol]["last_update"] = current_time
-                        crypto_prices[our_symbol]["source"] = "cryptocompare"
-                        success_count += 1
-                        logger.info(f"Курс {our_symbol.upper()}: ${price:.2f} ({change:.2f}%)")
-
-        return success_count > 0
-
+                if usd_data := data["RAW"].get(api_symbol, {}).get("USD"):
+                    crypto_prices[our_symbol].update({
+                        "price": usd_data.get("PRICE"),
+                        "change": usd_data.get("CHANGEPCT24HOUR"),
+                        "last_update": current_time,
+                        "source": "cryptocompare"
+                    })
+        return True
     except Exception as e:
-        logger.error(f"Ошибка CryptoCompare API: {e}")
+        logger.error(f"CryptoCompare API error: {e}")
         return False
 
 def _switch_api_source():
@@ -671,7 +618,7 @@ async def show_main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     lang = get_user_lang(chat_id)
 
     update_user_horoscope(chat_id)
-    update_crypto_prices()
+    await update_crypto_prices()
 
     title_raw = get_text('main_menu_title', lang)
     title = f"✨ *{escape_markdown(title_raw, 2)}* ✨"
@@ -748,7 +695,7 @@ async def show_zodiac_horoscope(update: Update, context: ContextTypes.DEFAULT_TY
     await query.answer()
 
     chat_id, lang = query.message.chat_id, get_user_lang(query.message.chat_id)
-    update_crypto_prices()
+    await update_crypto_prices()
 
     # --- Title ---
     current_date_md = escape_markdown(datetime.now().strftime("%d.%m.%Y"), 2)
@@ -943,7 +890,7 @@ async def handle_new_chat_member(update: Update, context: ContextTypes.DEFAULT_T
                 chat_ids.remove(chat_id)
                 save_broadcast_chats(chat_ids)
 
-def format_daily_summary(lang: str) -> str:
+async def format_daily_summary(lang: str) -> str:
     """Formats the full daily summary message in MarkdownV2."""
     # --- Title ---
     title_raw = get_text('astro_command_title', lang)
@@ -962,7 +909,7 @@ def format_daily_summary(lang: str) -> str:
     horoscope_section_md = escape_markdown(horoscope_section_raw, 2)
 
     # --- Market Data Section ---
-    update_crypto_prices()
+    await update_crypto_prices()
     market_data_items = []
     latest_update_time = None
     latest_source = "unknown"
@@ -1007,7 +954,7 @@ async def astro_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Handler for the /astro command."""
     update_user_horoscope(update.message.chat_id)
     lang = get_user_lang(update.message.chat_id)
-    full_message = format_daily_summary(lang)
+    full_message = await format_daily_summary(lang)
     await update.message.reply_text(full_message, parse_mode=ParseMode.MARKDOWN_V2)
 
 
@@ -1335,7 +1282,7 @@ def main() -> None:
     # Инициализация курсов криптовалют
     logger.info("📊 Инициализация курсов криптовалют...")
     if not cache_loaded:
-        update_crypto_prices()
+        asyncio.run(update_crypto_prices())
     else:
         logger.info("✅ Используем кэшированные данные")
 
